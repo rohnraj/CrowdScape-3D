@@ -181,8 +181,8 @@ function buildCrowdPeople(scene, zone, yBase) {
     color: col, emissive: col, emissiveIntensity: 0.25, roughness: 0.55,
   });
 
-  const bodyGeo = new THREE.CylinderGeometry(0.062, 0.076, 0.88, 6);
-  const headGeo = new THREE.SphereGeometry(0.092, 7, 7);
+  const bodyGeo = new THREE.CylinderGeometry(0.031, 0.038, 0.44, 6);
+  const headGeo = new THREE.SphereGeometry(0.046, 7, 7);
   const bodies = new THREE.InstancedMesh(bodyGeo, mat, count);
   const heads = new THREE.InstancedMesh(headGeo, mat.clone(), count);
   const dummy = new THREE.Object3D();
@@ -192,10 +192,10 @@ function buildCrowdPeople(scene, zone, yBase) {
     const px = zone.x + (Math.random() - 0.5) * (zone.w - pad * 2);
     const pz = zone.z + (Math.random() - 0.5) * (zone.d - pad * 2);
 
-    dummy.position.set(px, yBase + 0.44, pz);
+    dummy.position.set(px, yBase + 0.22, pz);
     dummy.updateMatrix(); bodies.setMatrixAt(i, dummy.matrix);
 
-    dummy.position.set(px, yBase + 1.02, pz);
+    dummy.position.set(px, yBase + 0.51, pz);
     dummy.updateMatrix(); heads.setMatrixAt(i, dummy.matrix);
   }
   bodies.instanceMatrix.needsUpdate = true;
