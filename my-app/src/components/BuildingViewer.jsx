@@ -4,25 +4,25 @@ import { PointerLockControls } from 'three/addons/controls/PointerLockControls.j
 import { getOccupancyColor, getOccupancyLabel } from '../data/zones.js';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const ROOM_H     = 2.8;
+const ROOM_H = 2.8;
 const FLOOR_STEP = 3.5;
-const EYE_H      = 1.65;
+const EYE_H = 1.65;
 const WALK_SPEED = 5.5;
-const BLDG_W     = 18;
-const BLDG_D     = 12;
-const FOV        = 72;
+const BLDG_W = 18;
+const BLDG_D = 12;
+const FOV = 72;
 
 // ── Canvas texture: room info billboard ───────────────────────────────────────
 function makeRoomTexture(zone) {
   const ratio = Math.min(zone.currentCapacity / zone.maxCapacity, 1);
-  const pct   = Math.round(ratio * 100);
+  const pct = Math.round(ratio * 100);
   const color = getOccupancyColor(ratio);
   const label = getOccupancyLabel(ratio);
   const floor = zone.floor === 0 ? 'Ground Floor' : 'Upper Floor';
 
   const W = 480, H = 290;
-  const c   = document.createElement('canvas');
-  c.width   = W; c.height = H;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
   const ctx = c.getContext('2d');
 
   // Background
@@ -68,8 +68,8 @@ function makeRoomTexture(zone) {
 
   // Stats columns
   const cols = [
-    { l: 'CURRENT',   v: zone.currentCapacity.toString() },
-    { l: 'CAPACITY',  v: zone.maxCapacity.toString() },
+    { l: 'CURRENT', v: zone.currentCapacity.toString() },
+    { l: 'CAPACITY', v: zone.maxCapacity.toString() },
     { l: 'AVAILABLE', v: `${Math.max(0, zone.maxCapacity - zone.currentCapacity)}` },
   ];
   const colW = (W - 46) / 3;
@@ -98,7 +98,7 @@ function makeFloorLabel(text) {
   ctx.fillText(text.toUpperCase(), 256, 30);
   const tex = new THREE.CanvasTexture(c);
   const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
-  const sp  = new THREE.Sprite(mat);
+  const sp = new THREE.Sprite(mat);
   sp.scale.set(7, 0.82, 1);
   return sp;
 }
@@ -107,7 +107,7 @@ function makeFloorLabel(text) {
 function buildFloorSlab(scene, yBase) {
   const geo = new THREE.BoxGeometry(BLDG_W + 0.1, 0.12, BLDG_D + 0.1);
   const mat = new THREE.MeshStandardMaterial({ color: '#111828', roughness: 0.9 });
-  const m   = new THREE.Mesh(geo, mat);
+  const m = new THREE.Mesh(geo, mat);
   m.position.set(0, yBase - 0.06, 0);
   scene.add(m);
 
@@ -127,11 +127,11 @@ function buildOuterWalls(scene, yBase) {
   const cy = yBase + ROOM_H / 2;
   [
     [0, cy, -BLDG_D / 2, BLDG_W, ROOM_H, 0],
-    [0, cy,  BLDG_D / 2, BLDG_W, ROOM_H, Math.PI],
-    [ BLDG_W / 2, cy, 0, BLDG_D, ROOM_H, -Math.PI / 2],
-    [-BLDG_W / 2, cy, 0, BLDG_D, ROOM_H,  Math.PI / 2],
+    [0, cy, BLDG_D / 2, BLDG_W, ROOM_H, Math.PI],
+    [BLDG_W / 2, cy, 0, BLDG_D, ROOM_H, -Math.PI / 2],
+    [-BLDG_W / 2, cy, 0, BLDG_D, ROOM_H, Math.PI / 2],
   ].forEach(([x, y, z, w, h, ry]) => {
-    const geo  = new THREE.PlaneGeometry(w, h);
+    const geo = new THREE.PlaneGeometry(w, h);
     const mesh = new THREE.Mesh(geo, mat.clone());
     mesh.position.set(x, y, z); mesh.rotation.y = ry;
     scene.add(mesh);
@@ -140,9 +140,9 @@ function buildOuterWalls(scene, yBase) {
 }
 
 function buildFloorTile(scene, zone, yBase) {
-  const ratio     = zone.currentCapacity / zone.maxCapacity;
+  const ratio = zone.currentCapacity / zone.maxCapacity;
   const darkColor = new THREE.Color(getOccupancyColor(ratio)).multiplyScalar(0.26);
-  const emissive  = new THREE.Color(getOccupancyColor(ratio));
+  const emissive = new THREE.Color(getOccupancyColor(ratio));
 
   const geo = new THREE.PlaneGeometry(zone.w - 0.06, zone.d - 0.06);
   const mat = new THREE.MeshStandardMaterial({
@@ -165,7 +165,7 @@ function buildFloorTile(scene, zone, yBase) {
 function buildCeiling(scene, zone, yBase) {
   const geo = new THREE.PlaneGeometry(zone.w - 0.06, zone.d - 0.06);
   const mat = new THREE.MeshStandardMaterial({ color: '#0b1220', roughness: 0.92 });
-  const m   = new THREE.Mesh(geo, mat);
+  const m = new THREE.Mesh(geo, mat);
   m.rotation.x = Math.PI / 2;
   m.position.set(zone.x, yBase + ROOM_H - 0.01, zone.z);
   scene.add(m);
@@ -183,10 +183,10 @@ function buildCrowdPeople(scene, zone, yBase) {
 
   const bodyGeo = new THREE.CylinderGeometry(0.062, 0.076, 0.88, 6);
   const headGeo = new THREE.SphereGeometry(0.092, 7, 7);
-  const bodies  = new THREE.InstancedMesh(bodyGeo, mat, count);
-  const heads   = new THREE.InstancedMesh(headGeo, mat.clone(), count);
-  const dummy   = new THREE.Object3D();
-  const pad     = 0.46;
+  const bodies = new THREE.InstancedMesh(bodyGeo, mat, count);
+  const heads = new THREE.InstancedMesh(headGeo, mat.clone(), count);
+  const dummy = new THREE.Object3D();
+  const pad = 0.46;
 
   for (let i = 0; i < count; i++) {
     const px = zone.x + (Math.random() - 0.5) * (zone.w - pad * 2);
@@ -199,7 +199,7 @@ function buildCrowdPeople(scene, zone, yBase) {
     dummy.updateMatrix(); heads.setMatrixAt(i, dummy.matrix);
   }
   bodies.instanceMatrix.needsUpdate = true;
-  heads.instanceMatrix.needsUpdate  = true;
+  heads.instanceMatrix.needsUpdate = true;
   scene.add(bodies, heads);
 }
 
@@ -218,8 +218,8 @@ function buildInfoPanel(scene, zone, yBase, billboards) {
 // ── Camera helpers ────────────────────────────────────────────────────────────
 function clampCamera(cam) {
   cam.position.x = Math.max(-9.1, Math.min(9.1, cam.position.x));
-  cam.position.z = Math.max(-15,  Math.min(6.4, cam.position.z));
-  cam.position.y = Math.max(0.3,  Math.min(FLOOR_STEP * 1.7 + EYE_H, cam.position.y));
+  cam.position.z = Math.max(-15, Math.min(6.4, cam.position.z));
+  cam.position.y = Math.max(0.3, Math.min(FLOOR_STEP * 1.7 + EYE_H, cam.position.y));
 }
 
 function detectZone(cam, zones, nearZoneRef, setNearZone) {
@@ -239,7 +239,7 @@ function detectZone(cam, zones, nearZoneRef, setNearZone) {
 // ── ZoneHUD — bottom-center panel when inside a zone ─────────────────────────
 function ZoneHUD({ zone }) {
   const ratio = Math.min(zone.currentCapacity / zone.maxCapacity, 1);
-  const pct   = Math.round(ratio * 100);
+  const pct = Math.round(ratio * 100);
   const color = getOccupancyColor(ratio);
   const label = getOccupancyLabel(ratio);
   const floorName = zone.floor === 0 ? 'Ground Floor' : 'Upper Floor';
@@ -271,13 +271,13 @@ function EnterOverlay({ onEnter }) {
       <div className="bv-enter-card">
         <div className="bv-enter-building-icon">
           <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="6" y="4" width="36" height="40" rx="2" stroke="#58a6ff" strokeWidth="2" fill="none"/>
-            <rect x="10" y="8"  width="8" height="8"  rx="1" fill="#58a6ff" opacity="0.7"/>
-            <rect x="22" y="8"  width="8" height="8"  rx="1" fill="#58a6ff" opacity="0.7"/>
-            <rect x="10" y="20" width="8" height="8"  rx="1" fill="#58a6ff" opacity="0.5"/>
-            <rect x="22" y="20" width="8" height="8"  rx="1" fill="#58a6ff" opacity="0.5"/>
-            <rect x="10" y="32" width="8" height="8"  rx="1" fill="#58a6ff" opacity="0.4"/>
-            <rect x="18" y="30" width="12" height="14" rx="1" fill="#58a6ff" opacity="0.9"/>
+            <rect x="6" y="4" width="36" height="40" rx="2" stroke="#58a6ff" strokeWidth="2" fill="none" />
+            <rect x="10" y="8" width="8" height="8" rx="1" fill="#58a6ff" opacity="0.7" />
+            <rect x="22" y="8" width="8" height="8" rx="1" fill="#58a6ff" opacity="0.7" />
+            <rect x="10" y="20" width="8" height="8" rx="1" fill="#58a6ff" opacity="0.5" />
+            <rect x="22" y="20" width="8" height="8" rx="1" fill="#58a6ff" opacity="0.5" />
+            <rect x="10" y="32" width="8" height="8" rx="1" fill="#58a6ff" opacity="0.4" />
+            <rect x="18" y="30" width="12" height="14" rx="1" fill="#58a6ff" opacity="0.9" />
           </svg>
         </div>
         <h2 className="bv-enter-title">Nexus Tower</h2>
@@ -311,14 +311,14 @@ function Crosshair() {
 
 // ── BuildingViewer ─────────────────────────────────────────────────────────────
 export function BuildingViewer({ zones }) {
-  const mountRef      = useRef(null);
-  const cameraRef     = useRef(null);
-  const controlsRef   = useRef(null);
+  const mountRef = useRef(null);
+  const cameraRef = useRef(null);
+  const controlsRef = useRef(null);
   const billboardsRef = useRef([]);
-  const keysRef       = useRef({ w: false, a: false, s: false, d: false, q: false, e: false });
-  const nearZoneRef   = useRef(null);
-  const animRef       = useRef(null);
-  const clockRef      = useRef(new THREE.Clock());
+  const keysRef = useRef({ w: false, a: false, s: false, d: false, q: false, e: false });
+  const nearZoneRef = useRef(null);
+  const animRef = useRef(null);
+  const clockRef = useRef(new THREE.Clock());
 
   const [isLocked, setIsLocked] = useState(false);
   const [nearZone, setNearZone] = useState(null);
@@ -345,13 +345,13 @@ export function BuildingViewer({ zones }) {
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(W, H);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.toneMapping        = THREE.ACESFilmicToneMapping;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.1;
     mount.appendChild(renderer.domElement);
 
     // ── Pointer Lock Controls ─────────────────────────────────────────────────
     const controls = new PointerLockControls(camera, renderer.domElement);
-    controls.addEventListener('lock',   () => setIsLocked(true));
+    controls.addEventListener('lock', () => setIsLocked(true));
     controls.addEventListener('unlock', () => setIsLocked(false));
     controlsRef.current = controls;
 
@@ -366,10 +366,10 @@ export function BuildingViewer({ zones }) {
     // Per-zone ceiling lights — coloured by occupancy
     zones.forEach((zone) => {
       const yBase = zone.floor * FLOOR_STEP;
-      const lc    = new THREE.Color(getOccupancyColor(zone.currentCapacity / zone.maxCapacity));
+      const lc = new THREE.Color(getOccupancyColor(zone.currentCapacity / zone.maxCapacity));
       lc.lerp(new THREE.Color('#88aaff'), 0.42);
       const radius = Math.max(zone.w, zone.d) * 1.6;
-      const light  = new THREE.PointLight(lc, 1.4, radius);
+      const light = new THREE.PointLight(lc, 1.4, radius);
       light.position.set(zone.x, yBase + ROOM_H - 0.12, zone.z);
       scene.add(light);
     });
@@ -410,10 +410,10 @@ export function BuildingViewer({ zones }) {
     // Colored translucent room boxes so the building is visible before entering
     zones.forEach((zone) => {
       const ratio = zone.currentCapacity / zone.maxCapacity;
-      const col   = new THREE.Color(getOccupancyColor(ratio));
+      const col = new THREE.Color(getOccupancyColor(ratio));
       const yBase = zone.floor * FLOOR_STEP;
-      const geo   = new THREE.BoxGeometry(zone.w, ROOM_H, zone.d);
-      const mat   = new THREE.MeshStandardMaterial({
+      const geo = new THREE.BoxGeometry(zone.w, ROOM_H, zone.d);
+      const mat = new THREE.MeshStandardMaterial({
         color: col, emissive: col, emissiveIntensity: 0.08,
         transparent: true, opacity: 0.18, side: THREE.FrontSide,
         roughness: 0.3, metalness: 0.05,
@@ -426,23 +426,23 @@ export function BuildingViewer({ zones }) {
     // ── Keyboard ─────────────────────────────────────────────────────────────
     const keys = keysRef.current;
     const onKeyDown = (e) => {
-      if (e.code === 'KeyW' || e.code === 'ArrowUp')    keys.w = true;
-      if (e.code === 'KeyS' || e.code === 'ArrowDown')  keys.s = true;
-      if (e.code === 'KeyA' || e.code === 'ArrowLeft')  keys.a = true;
+      if (e.code === 'KeyW' || e.code === 'ArrowUp') keys.w = true;
+      if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.s = true;
+      if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.a = true;
       if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.d = true;
       if (e.code === 'KeyQ') keys.q = true;
       if (e.code === 'KeyE') keys.e = true;
     };
     const onKeyUp = (e) => {
-      if (e.code === 'KeyW' || e.code === 'ArrowUp')    keys.w = false;
-      if (e.code === 'KeyS' || e.code === 'ArrowDown')  keys.s = false;
-      if (e.code === 'KeyA' || e.code === 'ArrowLeft')  keys.a = false;
+      if (e.code === 'KeyW' || e.code === 'ArrowUp') keys.w = false;
+      if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.s = false;
+      if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.a = false;
       if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.d = false;
       if (e.code === 'KeyQ') keys.q = false;
       if (e.code === 'KeyE') keys.e = false;
     };
     document.addEventListener('keydown', onKeyDown);
-    document.addEventListener('keyup',   onKeyUp);
+    document.addEventListener('keyup', onKeyUp);
 
     // ── Scroll: move forward/back ─────────────────────────────────────────────
     const onWheel = (e) => {
@@ -459,9 +459,9 @@ export function BuildingViewer({ zones }) {
     // ── Animate loop ──────────────────────────────────────────────────────────
     function animate() {
       animRef.current = requestAnimationFrame(animate);
-      const dt    = Math.min(clockRef.current.getDelta(), 0.05);
+      const dt = Math.min(clockRef.current.getDelta(), 0.05);
       const speed = WALK_SPEED * dt;
-      const k     = keysRef.current;
+      const k = keysRef.current;
 
       // Movement direction — always horizontal
       const dir = new THREE.Vector3();
@@ -475,7 +475,7 @@ export function BuildingViewer({ zones }) {
       if (k.w) camera.position.addScaledVector(dir, speed);
       if (k.s) camera.position.addScaledVector(dir, -speed);
       if (k.a) camera.position.addScaledVector(right, -speed);
-      if (k.d) camera.position.addScaledVector(right,  speed);
+      if (k.d) camera.position.addScaledVector(right, speed);
       if (k.q) camera.position.y += speed * 0.65;
       if (k.e) camera.position.y -= speed * 0.65;
 
@@ -505,7 +505,7 @@ export function BuildingViewer({ zones }) {
     return () => {
       window.removeEventListener('resize', onResize);
       document.removeEventListener('keydown', onKeyDown);
-      document.removeEventListener('keyup',   onKeyUp);
+      document.removeEventListener('keyup', onKeyUp);
       mount.removeEventListener('wheel', onWheel);
       cancelAnimationFrame(animRef.current);
       controls.dispose();
@@ -513,7 +513,7 @@ export function BuildingViewer({ zones }) {
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement);
       scene.clear();
       billboardsRef.current = [];
-      nearZoneRef.current   = null;
+      nearZoneRef.current = null;
     };
   }, [zones]);
 
