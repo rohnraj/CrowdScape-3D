@@ -1,46 +1,56 @@
 /**
- * Building: Nexus Tower — 2-floor office building
+ * Mall: Nexus Mall — 3-floor shopping center
  * Coordinate system: X (east-west), Z (north-south), Y (up)
- * Building footprint: X[-9, 9], Z[-6, 6] (18×12 units per floor)
- *
- * Each zone's position is its center; w = width (X), d = depth (Z)
+ * Building footprint: X[-12, 12], Z[-8, 8] (24×16 units per floor)
  */
 
-/** @typedef {{ id: string, name: string, currentCapacity: number, maxCapacity: number, floor: number, x: number, z: number, w: number, d: number }} Zone */
+/** @typedef {{ id: string, name: string, category: string, emoji: string, currentCapacity: number, maxCapacity: number, floor: number, x: number, z: number, w: number, d: number, color: string }} Shop */
 
-/** @type {Zone[]} */
+/** @type {Shop[]} */
 export const ZONES = [
-  // ── Ground Floor (floor: 0) ──────────────────────────────────────────────
-  // Row 1 — z: [-6, -3], full X width
-  { id: 'g-entrance', name: 'Main Entrance',        currentCapacity: 145, maxCapacity: 200, floor: 0, x: -5,   z: -4.5, w: 8,  d: 3 },
-  { id: 'g-lobby',    name: 'Lobby & Reception',    currentCapacity:  67, maxCapacity: 100, floor: 0, x:  4,   z: -4.5, w: 10, d: 3 },
-  // Row 2 — z: [-3, 3]
-  { id: 'g-cafeteria',name: 'Cafeteria',            currentCapacity: 312, maxCapacity: 350, floor: 0, x: -5.5, z:  0,   w: 7,  d: 6 },
-  { id: 'g-mr-a',     name: 'Meeting Room A',       currentCapacity:  18, maxCapacity:  20, floor: 0, x:  0.5, z: -1.5, w: 5,  d: 3 },
-  { id: 'g-mr-b',     name: 'Meeting Room B',       currentCapacity:   8, maxCapacity:  20, floor: 0, x:  0.5, z:  1.5, w: 5,  d: 3 },
-  { id: 'g-restrooms',name: 'Restrooms (G)',         currentCapacity:  12, maxCapacity:  30, floor: 0, x:  4.5, z: -1.5, w: 3,  d: 3 },
-  { id: 'g-security', name: 'Security Post',        currentCapacity:   4, maxCapacity:  10, floor: 0, x:  4.5, z:  1.5, w: 3,  d: 3 },
-  { id: 'g-stairwell',name: 'Stairwell & Lifts',    currentCapacity:  23, maxCapacity:  80, floor: 0, x:  7.5, z:  0,   w: 3,  d: 6 },
-  // Row 3 — z: [3, 6], utility/service
-  { id: 'g-corridor', name: 'Service Corridor',     currentCapacity:  14, maxCapacity:  80, floor: 0, x:  0,   z:  4.5, w: 18, d: 3 },
+  // ── Ground Floor (floor: 0) — Main Entrance & Anchor Stores ──────────────
+  { id: 'g-entrance',   name: 'Grand Atrium',        category: 'Common Area', emoji: '🏛️',  currentCapacity: 320, maxCapacity: 500, floor: 0, x:  0,    z: -5,   w: 10, d: 4,  color: '#60a5fa' },
+  { id: 'g-anchor1',    name: 'Zara',                category: 'Fashion',     emoji: '👗',  currentCapacity: 180, maxCapacity: 250, floor: 0, x: -7.5,  z: -1,   w: 7,  d: 6,  color: '#f472b6' },
+  { id: 'g-anchor2',    name: 'H&M',                 category: 'Fashion',     emoji: '🛍️', currentCapacity:  95, maxCapacity: 200, floor: 0, x:  7.5,  z: -1,   w: 7,  d: 6,  color: '#fb7185' },
+  { id: 'g-food1',      name: 'Starbucks',           category: 'Food & Bev',  emoji: '☕',  currentCapacity:  67, maxCapacity:  80, floor: 0, x: -4,    z:  4.5, w: 4,  d: 3,  color: '#34d399' },
+  { id: 'g-food2',      name: 'McDonald\'s',         category: 'Food & Bev',  emoji: '🍔',  currentCapacity: 112, maxCapacity: 150, floor: 0, x:  0,    z:  4.5, w: 4,  d: 3,  color: '#fbbf24' },
+  { id: 'g-food3',      name: 'Sushi Bar',           category: 'Food & Bev',  emoji: '🍣',  currentCapacity:  44, maxCapacity:  60, floor: 0, x:  4,    z:  4.5, w: 4,  d: 3,  color: '#f87171' },
+  { id: 'g-tech',       name: 'Apple Store',         category: 'Electronics', emoji: '🍎',  currentCapacity: 203, maxCapacity: 220, floor: 0, x: -9.5,  z:  4.5, w: 5,  d: 3,  color: '#a78bfa' },
+  { id: 'g-corridor',   name: 'Main Corridor',       category: 'Common Area', emoji: '🚶', currentCapacity:  88, maxCapacity: 400, floor: 0, x:  0,    z:  0,   w: 4,  d: 4,  color: '#94a3b8' },
+  { id: 'g-escalator',  name: 'Escalators',          category: 'Common Area', emoji: '⬆️', currentCapacity:  35, maxCapacity: 100, floor: 0, x:  9.5,  z:  4.5, w: 5,  d: 3,  color: '#64748b' },
 
-  // ── Upper Floor (floor: 1) ───────────────────────────────────────────────
-  // Main body — z: [-6, 3]
-  { id: 'u-openoffice',name: 'Open Office',         currentCapacity: 218, maxCapacity: 300, floor: 1, x: -3.5, z: -1.5, w: 11, d: 9 },
-  { id: 'u-conf-a',   name: 'Conference Room A',    currentCapacity:  47, maxCapacity:  50, floor: 1, x:  5.5, z: -3.5, w: 7,  d: 5 },
-  { id: 'u-conf-b',   name: 'Conference Room B',    currentCapacity:  12, maxCapacity:  40, floor: 1, x:  4,   z:  1,   w: 4,  d: 4 },
-  { id: 'u-exec',     name: 'Executive Suite',      currentCapacity:   6, maxCapacity:  15, floor: 1, x:  7.5, z:  1,   w: 3,  d: 4 },
-  // Row 3 — z: [3, 6]
-  { id: 'u-server',   name: 'Server Room',          currentCapacity:   3, maxCapacity:   8, floor: 1, x: -7,   z:  4.5, w: 4,  d: 3 },
-  { id: 'u-lounge',   name: 'Collaboration Lounge', currentCapacity:  38, maxCapacity:  60, floor: 1, x: -2.5, z:  4.5, w: 5,  d: 3 },
-  { id: 'u-hr',       name: 'HR Office',            currentCapacity:  24, maxCapacity:  40, floor: 1, x:  4.5, z:  4.5, w: 9,  d: 3 },
-  { id: 'f2-server',  name: 'Server Room',     currentCapacity:  30, maxCapacity:  23, floor: 2, x:  -3.5, z:  -1.5, w: 11,  d: 9 },
+  // ── First Floor (floor: 1) — Lifestyle & Entertainment ───────────────────
+  { id: 'f1-cinema',    name: 'PVR Cinemas',         category: 'Entertainment',emoji: '🎬', currentCapacity: 380, maxCapacity: 450, floor: 1, x: -6,    z: -3,   w: 10, d: 8,  color: '#c084fc' },
+  { id: 'f1-nike',      name: 'Nike',                category: 'Sports',      emoji: '👟',  currentCapacity:  78, maxCapacity: 120, floor: 1, x:  6.5,  z: -4,   w: 7,  d: 5,  color: '#f97316' },
+  { id: 'f1-adidas',    name: 'Adidas',              category: 'Sports',      emoji: '🏃',  currentCapacity:  55, maxCapacity: 100, floor: 1, x:  6.5,  z:  1,   w: 7,  d: 4,  color: '#38bdf8' },
+  { id: 'f1-books',     name: 'Crossword Books',     category: 'Lifestyle',   emoji: '📚',  currentCapacity:  32, maxCapacity:  80, floor: 1, x: -3,    z:  4.5, w: 6,  d: 3,  color: '#a3e635' },
+  { id: 'f1-spa',       name: 'Luxury Spa',          category: 'Wellness',    emoji: '💆',  currentCapacity:  18, maxCapacity:  40, floor: 1, x:  3,    z:  4.5, w: 6,  d: 3,  color: '#f0abfc' },
+  { id: 'f1-arcade',    name: 'Game Zone',           category: 'Entertainment',emoji: '🎮', currentCapacity: 145, maxCapacity: 180, floor: 1, x:  9.5,  z:  4.5, w: 5,  d: 3,  color: '#fb923c' },
+
+  // ── Second Floor (floor: 2) — Food Court & Premium ───────────────────────
+  { id: 'f2-foodcourt', name: 'Food Court',          category: 'Food & Bev',  emoji: '🍽️', currentCapacity: 420, maxCapacity: 600, floor: 2, x:  0,    z: -2,   w: 16, d: 8,  color: '#fde68a' },
+  { id: 'f2-premium1',  name: 'Louis Vuitton',       category: 'Luxury',      emoji: '👜',  currentCapacity:  22, maxCapacity:  50, floor: 2, x: -8.5,  z:  3.5, w: 7,  d: 5,  color: '#d4af37' },
+  { id: 'f2-premium2',  name: 'Rolex Boutique',      category: 'Luxury',      emoji: '⌚',  currentCapacity:   8, maxCapacity:  25, floor: 2, x: -1,    z:  4.5, w: 6,  d: 3,  color: '#c0a060' },
+  { id: 'f2-premium3',  name: 'Sephora',             category: 'Beauty',      emoji: '💄',  currentCapacity:  67, maxCapacity:  90, floor: 2, x:  6,    z:  3.5, w: 8,  d: 5,  color: '#f9a8d4' },
 ];
 
 export const FLOOR_LABELS = {
   0: 'Ground Floor',
-  1: 'Upper Floor',
-  2: '3rd Floor',
+  1: 'First Floor',
+  2: 'Second Floor',
+};
+
+export const CATEGORY_COLORS = {
+  'Fashion':       '#f472b6',
+  'Food & Bev':    '#fbbf24',
+  'Electronics':   '#a78bfa',
+  'Entertainment': '#c084fc',
+  'Sports':        '#38bdf8',
+  'Lifestyle':     '#a3e635',
+  'Wellness':      '#f0abfc',
+  'Luxury':        '#d4af37',
+  'Beauty':        '#f9a8d4',
+  'Common Area':   '#94a3b8',
 };
 
 /**
@@ -48,12 +58,12 @@ export const FLOOR_LABELS = {
  * @param {number} ratio — currentCapacity / maxCapacity (0–1+)
  */
 export function getOccupancyColor(ratio) {
-  if (ratio <= 0)    return '#6b7280'; // empty / grey
-  if (ratio < 0.40)  return '#22c55e'; // green  — low
-  if (ratio < 0.65)  return '#84cc16'; // lime   — moderate
-  if (ratio < 0.80)  return '#eab308'; // yellow — high
-  if (ratio < 0.92)  return '#f97316'; // orange — very high
-  return               '#ef4444';       // red    — critical
+  if (ratio <= 0)    return '#6b7280';
+  if (ratio < 0.40)  return '#22c55e';
+  if (ratio < 0.65)  return '#84cc16';
+  if (ratio < 0.80)  return '#eab308';
+  if (ratio < 0.92)  return '#f97316';
+  return               '#ef4444';
 }
 
 /**
@@ -62,9 +72,9 @@ export function getOccupancyColor(ratio) {
  */
 export function getOccupancyLabel(ratio) {
   if (ratio <= 0)   return 'Empty';
-  if (ratio < 0.40) return 'Low';
-  if (ratio < 0.65) return 'Moderate';
-  if (ratio < 0.80) return 'High';
-  if (ratio < 0.92) return 'Very High';
-  return              'Critical';
+  if (ratio < 0.40) return 'Quiet';
+  if (ratio < 0.65) return 'Busy';
+  if (ratio < 0.80) return 'Crowded';
+  if (ratio < 0.92) return 'Very Busy';
+  return              'Packed';
 }
