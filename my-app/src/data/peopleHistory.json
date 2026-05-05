@@ -1,0 +1,93 @@
+{
+  "_comment": "Visit history for each person — shops they have already visited today (in order).",
+  "history": {
+    "p001": [
+      { "shop": "Grand Atrium", "time": "10:05 AM", "duration": "3 min" },
+      { "shop": "Zara", "time": "10:12 AM", "duration": "25 min" },
+      { "shop": "Starbucks", "time": "10:40 AM", "duration": "15 min" }
+    ],
+    "p002": [
+      { "shop": "H&M", "time": "09:30 AM", "duration": "40 min" },
+      { "shop": "Main Corridor", "time": "10:12 AM", "duration": "2 min" },
+      { "shop": "McDonald's", "time": "10:15 AM", "duration": "20 min" },
+      { "shop": "Nike", "time": "10:50 AM", "duration": "30 min" }
+    ],
+    "p003": [
+      { "shop": "Starbucks", "time": "11:00 AM", "duration": "12 min" },
+      { "shop": "McDonald's", "time": "11:15 AM", "duration": "18 min" },
+      { "shop": "Sushi Bar", "time": "11:35 AM", "duration": "22 min" }
+    ],
+    "p004": [
+      { "shop": "Grand Atrium", "time": "09:00 AM", "duration": "5 min" },
+      { "shop": "H&M", "time": "09:10 AM", "duration": "35 min" },
+      { "shop": "PVR Cinemas", "time": "09:50 AM", "duration": "120 min" },
+      { "shop": "Crossword Books", "time": "12:00 PM", "duration": "15 min" },
+      { "shop": "Food Court", "time": "12:20 PM", "duration": "45 min" }
+    ],
+    "p005": [
+      { "shop": "PVR Cinemas", "time": "10:00 AM", "duration": "150 min" },
+      { "shop": "Luxury Spa", "time": "12:35 PM", "duration": "20 min" },
+      { "shop": "Game Zone", "time": "01:00 PM", "duration": "40 min" }
+    ],
+    "p006": [
+      { "shop": "Nike", "time": "09:45 AM", "duration": "30 min" },
+      { "shop": "Adidas", "time": "10:20 AM", "duration": "25 min" },
+      { "shop": "Apple Store", "time": "10:50 AM", "duration": "45 min" },
+      { "shop": "Zara", "time": "11:40 AM", "duration": "20 min" }
+    ],
+    "p007": [
+      { "shop": "Louis Vuitton", "time": "11:00 AM", "duration": "30 min" },
+      { "shop": "Rolex Boutique", "time": "11:35 AM", "duration": "15 min" },
+      { "shop": "Sephora", "time": "11:55 AM", "duration": "40 min" },
+      { "shop": "Food Court", "time": "12:40 PM", "duration": "25 min" }
+    ],
+    "p008": [
+      { "shop": "Food Court", "time": "12:00 PM", "duration": "35 min" },
+      { "shop": "Adidas", "time": "12:40 PM", "duration": "20 min" },
+      { "shop": "Crossword Books", "time": "01:05 PM", "duration": "30 min" },
+      { "shop": "PVR Cinemas", "time": "01:40 PM", "duration": "10 min" }
+    ],
+    "p009": [
+      { "shop": "Zara", "time": "10:00 AM", "duration": "50 min" },
+      { "shop": "H&M", "time": "10:55 AM", "duration": "35 min" },
+      { "shop": "Sushi Bar", "time": "11:35 AM", "duration": "20 min" },
+      { "shop": "Starbucks", "time": "12:00 PM", "duration": "10 min" }
+    ],
+    "p010": [
+      { "shop": "Rolex Boutique", "time": "10:30 AM", "duration": "20 min" },
+      { "shop": "Louis Vuitton", "time": "11:00 AM", "duration": "45 min" },
+      { "shop": "Food Court", "time": "11:50 AM", "duration": "30 min" },
+      { "shop": "Luxury Spa", "time": "12:25 PM", "duration": "60 min" },
+      { "shop": "Sephora", "time": "01:30 PM", "duration": "25 min" }
+    ],
+    "p011": [
+      { "shop": "McDonald's", "time": "11:30 AM", "duration": "15 min" },
+      { "shop": "Sushi Bar", "time": "11:50 AM", "duration": "25 min" },
+      { "shop": "Grand Atrium", "time": "12:20 PM", "duration": "5 min" },
+      { "shop": "Zara", "time": "12:30 PM", "duration": "30 min" }
+    ],
+    "p012": [
+      { "shop": "Game Zone", "time": "10:00 AM", "duration": "60 min" },
+      { "shop": "PVR Cinemas", "time": "11:05 AM", "duration": "120 min" },
+      { "shop": "Crossword Books", "time": "01:10 PM", "duration": "20 min" }
+    ],
+    "p013": [
+      { "shop": "Sephora", "time": "10:15 AM", "duration": "35 min" },
+      { "shop": "Food Court", "time": "10:55 AM", "duration": "25 min" },
+      { "shop": "Louis Vuitton", "time": "11:25 AM", "duration": "40 min" },
+      { "shop": "Rolex Boutique", "time": "12:10 PM", "duration": "15 min" }
+    ],
+    "p014": [
+      { "shop": "Grand Atrium", "time": "09:15 AM", "duration": "5 min" },
+      { "shop": "H&M", "time": "09:25 AM", "duration": "30 min" },
+      { "shop": "Luxury Spa", "time": "10:00 AM", "duration": "90 min" },
+      { "shop": "Crossword Books", "time": "11:35 AM", "duration": "25 min" }
+    ],
+    "p015": [
+      { "shop": "Crossword Books", "time": "09:30 AM", "duration": "45 min" },
+      { "shop": "PVR Cinemas", "time": "10:20 AM", "duration": "130 min" },
+      { "shop": "Food Court", "time": "12:35 PM", "duration": "30 min" },
+      { "shop": "Louis Vuitton", "time": "01:10 PM", "duration": "20 min" }
+    ]
+  }
+}

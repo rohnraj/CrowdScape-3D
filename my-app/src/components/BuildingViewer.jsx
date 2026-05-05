@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { getOccupancyColor, getOccupancyLabel } from '../data/zones.js';
+import PEOPLE_DATA from '../data/people.json';
+import PEOPLE_HISTORY from '../data/peopleHistory.json';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const FLOOR_H    = 3.2;
@@ -21,30 +23,39 @@ const START_X =  0;
 const START_Z =  18;
 
 // ── Stair geometry constants (shared between builder and movement) ─────────────
-// Stairs are on the LEFT wall (x ≈ STAIR_X), running along Z.
-// Walking in the −Z direction goes UP; walking in the +Z direction goes DOWN.
-const STAIR_X     = -9.0;   // centre X of stairwell
-const STAIR_W     =  2.8;   // width along X
-const STAIR_Z_BOT =  5.5;   // z at the bottom landing (floor N)
-const STAIR_Z_TOP = -4.0;   // z at the top landing   (floor N+1)
-const STAIR_LEN   = Math.abs(STAIR_Z_BOT - STAIR_Z_TOP);
+// Stairs are in a dedicated corridor on the RIGHT side of the mall.
+// This keeps them clear of all shop zones and reachable from every floor.
+// MALL bounds: X ∈ [-12, 12], Z ∈ [-8, 8]
+// Stair corridor: X ∈ [9, 12], Z ∈ [-7, 6]  — right wall, full depth
+const STAIR_X     =  10.5;  // centre X of stairwell (right side, clear of shops)
+const STAIR_W     =   2.4;  // width along X
+const STAIR_Z_BOT =   5.0;  // z at the bottom (floor N) — positive Z = front
+const STAIR_Z_TOP =  -6.0;  // z at the top    (floor N+1) — negative Z = back
+const STAIR_LEN   = Math.abs(STAIR_Z_BOT - STAIR_Z_TOP); // 11 units
 
-// Returns the interpolated Y on the ramp surface for a given Z position
-// (only valid when STAIR_Z_TOP <= z <= STAIR_Z_BOT)
-function rampYatZ(z, floorIndex) {
-  const yBot = floorIndex * FLOOR_STEP;
-  const yTop = (floorIndex + 1) * FLOOR_STEP;
-  const t = (STAIR_Z_BOT - z) / STAIR_LEN;   // 0 at bottom, 1 at top
+// Returns the ramp surface Y for a given Z, for the stair connecting
+// floor `seg` to floor `seg+1`.
+function rampYatZ(z, seg) {
+  const yBot = seg * FLOOR_STEP;
+  const yTop = (seg + 1) * FLOOR_STEP;
+  const t = Math.max(0, Math.min(1, (STAIR_Z_BOT - z) / STAIR_LEN));
   return yBot + (yTop - yBot) * t;
 }
 
-// Is the player currently on the stairwell footprint?
+// Is the player's XZ inside the stairwell footprint?
 function onStairXZ(x, z) {
   return (
-    Math.abs(x - STAIR_X) < STAIR_W / 2 &&
-    z >= STAIR_Z_TOP - 0.5 &&
-    z <= STAIR_Z_BOT + 0.5
+    Math.abs(x - STAIR_X) < STAIR_W / 2 + 0.15 &&
+    z >= STAIR_Z_TOP - 0.4 &&
+    z <= STAIR_Z_BOT + 0.4
   );
+}
+
+// Which stair segment (0→1 or 1→2) is closest to the player's current Y?
+function resolveStairSeg(camY, z) {
+  const y0 = rampYatZ(z, 0) + EYE_H;
+  const y1 = rampYatZ(z, 1) + EYE_H;
+  return Math.abs(camY - y0) <= Math.abs(camY - y1) ? 0 : 1;
 }
 
 // ── Canvas texture: shop info billboard ───────────────────────────────────────
@@ -226,29 +237,6 @@ function buildPlaza(scene, walkable) {
     gm.receiveShadow = true;
     scene.add(gm);
   });
-
-  // Trees
-  const treeMat  = new THREE.MeshStandardMaterial({ color: '#2d6a1f', roughness: 0.9 });
-  const trunkMat = new THREE.MeshStandardMaterial({ color: '#5c3d1e', roughness: 1.0 });
-  const treeGeo  = new THREE.ConeGeometry(1.6, 4.5, 6);
-  const trunkGeo = new THREE.CylinderGeometry(0.28, 0.38, 1.8, 6);
-  for (let i = 0; i < 50; i++) {
-    const x = (Math.random() - 0.5) * 90;
-    const z = (Math.random() - 0.5) * 90;
-    if (Math.abs(x) < MALL_W/2 + 4 && Math.abs(z) < MALL_D/2 + 4) continue;
-    if (Math.abs(x) < 5 && z > 0) continue;
-    const sc = 0.5 + Math.random() * 0.9;
-    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-    trunk.position.set(x, sc*0.9 - 0.05, z);
-    trunk.scale.setScalar(sc);
-    trunk.castShadow = true;
-    const leaves = new THREE.Mesh(treeGeo, treeMat);
-    leaves.position.set(x, sc*1.8 + sc*0.9 - 0.05, z);
-    leaves.scale.setScalar(sc);
-    leaves.castShadow = true;
-    leaves.rotation.y = Math.random() * Math.PI;
-    scene.add(trunk, leaves);
-  }
 }
 
 // ── Floor slab ────────────────────────────────────────────────────────────────
@@ -411,12 +399,11 @@ function buildStairs(scene, walkableByFloor) {
     ramp.castShadow = true;
     ramp.receiveShadow = true;
     scene.add(ramp);
-    // Add to BOTH adjacent floors so raycaster finds it from either side
     walkableByFloor[floor].push(ramp);
     walkableByFloor[floor + 1].push(ramp);
 
     // ── Step treads (visual) ──────────────────────────────────────────────────
-    const STEPS = 12;
+    const STEPS = 14;
     for (let s = 0; s < STEPS; s++) {
       const t  = (s + 0.5) / STEPS;
       const sz = STAIR_Z_BOT + (STAIR_Z_TOP - STAIR_Z_BOT) * t;
@@ -434,9 +421,8 @@ function buildStairs(scene, walkableByFloor) {
       rail.position.set(STAIR_X + dx, yMid + 0.65, zMid);
       rail.rotation.x = angle;
       scene.add(rail);
-      // Vertical posts every 2 units
-      for (let p = 0; p <= 4; p++) {
-        const pt = p / 4;
+      for (let p = 0; p <= 5; p++) {
+        const pt = p / 5;
         const pz = STAIR_Z_BOT + (STAIR_Z_TOP - STAIR_Z_BOT) * pt;
         const py = yBot + (yTop - yBot) * pt;
         const postGeo = new THREE.BoxGeometry(0.06, 0.7, 0.06);
@@ -447,7 +433,7 @@ function buildStairs(scene, walkableByFloor) {
     });
 
     // ── Stairwell enclosure walls ─────────────────────────────────────────────
-    const wallMat = new THREE.MeshStandardMaterial({ color: '#1e293b', roughness: 0.9, transparent: true, opacity: 0.55 });
+    const wallMat = new THREE.MeshStandardMaterial({ color: '#1e293b', roughness: 0.9, transparent: true, opacity: 0.5 });
     [-STAIR_W / 2 - 0.06, STAIR_W / 2 + 0.06].forEach(dx => {
       const wGeo = new THREE.BoxGeometry(0.12, FLOOR_STEP + 0.5, STAIR_LEN + 0.7);
       const wall = new THREE.Mesh(wGeo, wallMat);
@@ -456,65 +442,54 @@ function buildStairs(scene, walkableByFloor) {
     });
 
     // ── Bottom landing ────────────────────────────────────────────────────────
-    const botLand = new THREE.Mesh(new THREE.BoxGeometry(STAIR_W + 0.4, 0.15, 2.2), landMat);
-    botLand.position.set(STAIR_X, yBot - 0.075, STAIR_Z_BOT + 1.1);
+    const botLand = new THREE.Mesh(new THREE.BoxGeometry(STAIR_W + 0.4, 0.15, 2.4), landMat);
+    botLand.position.set(STAIR_X, yBot - 0.075, STAIR_Z_BOT + 1.2);
     botLand.receiveShadow = true;
     scene.add(botLand);
     walkableByFloor[floor].push(botLand);
 
     // ── Top landing ───────────────────────────────────────────────────────────
-    const topLand = new THREE.Mesh(new THREE.BoxGeometry(STAIR_W + 0.4, 0.15, 2.2), landMat);
-    topLand.position.set(STAIR_X, yTop - 0.075, STAIR_Z_TOP - 1.1);
+    const topLand = new THREE.Mesh(new THREE.BoxGeometry(STAIR_W + 0.4, 0.15, 2.4), landMat);
+    topLand.position.set(STAIR_X, yTop - 0.075, STAIR_Z_TOP - 1.2);
     topLand.receiveShadow = true;
     scene.add(topLand);
     walkableByFloor[floor + 1].push(topLand);
 
-    // ── Glowing floor-change sign ─────────────────────────────────────────────
+    // ── Glowing "▲ Floor N+1" sign at stair bottom ───────────────────────────
     const signMat = new THREE.MeshStandardMaterial({
       color: '#1e40af', roughness: 0.5,
-      emissive: '#3b82f6', emissiveIntensity: 0.6,
+      emissive: '#3b82f6', emissiveIntensity: 0.7,
     });
     const signBox = new THREE.Mesh(new THREE.BoxGeometry(STAIR_W - 0.1, 0.55, 0.1), signMat);
-    signBox.position.set(STAIR_X, yBot + 2.5, STAIR_Z_BOT + 0.12);
+    signBox.position.set(STAIR_X, yBot + 2.5, STAIR_Z_BOT + 0.15);
     scene.add(signBox);
 
-    const sc = document.createElement('canvas');
-    sc.width = 256; sc.height = 72;
-    const sctx = sc.getContext('2d');
-    sctx.fillStyle = '#1d4ed8';
-    sctx.fillRect(0, 0, 256, 72);
-    sctx.fillStyle = '#ffffff';
-    sctx.font = 'bold 24px system-ui';
-    sctx.textAlign = 'center'; sctx.textBaseline = 'middle';
-    sctx.fillText(`▲  Floor ${floor + 1}`, 128, 36);
-    const stex = new THREE.CanvasTexture(sc);
-    const signPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(STAIR_W - 0.15, 0.5),
-      new THREE.MeshBasicMaterial({ map: stex, transparent: true })
-    );
-    signPlane.position.set(STAIR_X, yBot + 2.5, STAIR_Z_BOT + 0.18);
-    scene.add(signPlane);
+    const makeSignCanvas = (text, bg, fg) => {
+      const sc = document.createElement('canvas');
+      sc.width = 256; sc.height = 72;
+      const ctx = sc.getContext('2d');
+      ctx.fillStyle = bg; ctx.fillRect(0, 0, 256, 72);
+      ctx.fillStyle = fg; ctx.font = 'bold 26px system-ui';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(text, 128, 36);
+      return new THREE.CanvasTexture(sc);
+    };
 
-    // Down sign on upper landing
-    if (floor > 0 || true) {
-      const sc2 = document.createElement('canvas');
-      sc2.width = 256; sc2.height = 72;
-      const sctx2 = sc2.getContext('2d');
-      sctx2.fillStyle = '#374151';
-      sctx2.fillRect(0, 0, 256, 72);
-      sctx2.fillStyle = '#d1d5db';
-      sctx2.font = 'bold 24px system-ui';
-      sctx2.textAlign = 'center'; sctx2.textBaseline = 'middle';
-      sctx2.fillText(`▼  Floor ${floor}`, 128, 36);
-      const stex2 = new THREE.CanvasTexture(sc2);
-      const downSign = new THREE.Mesh(
-        new THREE.PlaneGeometry(STAIR_W - 0.15, 0.5),
-        new THREE.MeshBasicMaterial({ map: stex2, transparent: true })
-      );
-      downSign.position.set(STAIR_X, yTop + 2.5, STAIR_Z_TOP - 0.18);
-      downSign.rotation.y = Math.PI;
-      scene.add(downSign);
-    }
+    const upSign = new THREE.Mesh(
+      new THREE.PlaneGeometry(STAIR_W - 0.15, 0.5),
+      new THREE.MeshBasicMaterial({ map: makeSignCanvas(`▲  Floor ${floor + 1}`, '#1d4ed8', '#ffffff'), transparent: true })
+    );
+    upSign.position.set(STAIR_X, yBot + 2.5, STAIR_Z_BOT + 0.22);
+    scene.add(upSign);
+
+    // ── "▼ Floor N" sign at stair top ─────────────────────────────────────────
+    const downSign = new THREE.Mesh(
+      new THREE.PlaneGeometry(STAIR_W - 0.15, 0.5),
+      new THREE.MeshBasicMaterial({ map: makeSignCanvas(`▼  Floor ${floor}`, '#374151', '#d1d5db'), transparent: true })
+    );
+    downSign.position.set(STAIR_X, yTop + 2.5, STAIR_Z_TOP - 0.22);
+    downSign.rotation.y = Math.PI;
+    scene.add(downSign);
   }
 }
 
@@ -568,30 +543,218 @@ function buildShopSign(scene, zone, yBase) {
   scene.add(m);
 }
 
-// ── Crowd people ──────────────────────────────────────────────────────────────
-function buildCrowd(scene, zone, yBase, crowdAnimRef) {
+// ── Animated mall people (agent walkers) ─────────────────────────────────────
+// Full humanoid: head, torso, 2 arms, 2 legs — all animated with a walk cycle.
+
+// Proportions (all in world units, ~1/10 real scale)
+const AG_TOTAL_H  = 0.95;   // total height head-to-toe
+const AG_LEG_H    = 0.38;   // each leg length
+const AG_LEG_R    = 0.038;  // leg radius
+const AG_TORSO_H  = 0.30;   // torso height
+const AG_TORSO_RX = 0.065;  // torso half-width X
+const AG_TORSO_RZ = 0.050;  // torso half-depth Z
+const AG_ARM_H    = 0.26;   // arm length
+const AG_ARM_R    = 0.028;  // arm radius
+const AG_HEAD_R   = 0.075;  // head radius
+const AG_ARRIVE   = 0.18;   // waypoint arrival radius
+
+// Y offsets from group origin (feet = y 0)
+const AG_Y_FEET   = 0;
+const AG_Y_HIP    = AG_LEG_H;
+const AG_Y_TORSO  = AG_Y_HIP  + AG_TORSO_H / 2;
+const AG_Y_SHLDR  = AG_Y_HIP  + AG_TORSO_H;
+const AG_Y_HEAD   = AG_Y_SHLDR + AG_HEAD_R + 0.02;
+
+function createAgentMesh(color) {
+  const col      = new THREE.Color(color);
+  const skinCol  = col.clone().lerp(new THREE.Color('#ffe0c8'), 0.45);
+  const shirtCol = col.clone();
+  const pantCol  = col.clone().multiplyScalar(0.55).lerp(new THREE.Color('#1e293b'), 0.5);
+
+  const mk = (geo, mat) => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; return m; };
+  const mat  = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.75 });
+
+  const group = new THREE.Group();
+
+  // ── Torso ──────────────────────────────────────────────────────────────────
+  const torso = mk(new THREE.BoxGeometry(AG_TORSO_RX * 2, AG_TORSO_H, AG_TORSO_RZ * 2), mat(shirtCol));
+  torso.position.y = AG_Y_TORSO;
+  group.add(torso);
+
+  // ── Head ───────────────────────────────────────────────────────────────────
+  const head = mk(new THREE.SphereGeometry(AG_HEAD_R, 8, 8), mat(skinCol));
+  head.position.y = AG_Y_HEAD;
+  group.add(head);
+
+  // ── Arms (pivot at shoulder, hang down) ────────────────────────────────────
+  const makeArm = (side) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(side * (AG_TORSO_RX + AG_ARM_R + 0.01), AG_Y_SHLDR, 0);
+    const arm = mk(new THREE.CylinderGeometry(AG_ARM_R, AG_ARM_R * 0.85, AG_ARM_H, 6), mat(shirtCol));
+    arm.position.y = -AG_ARM_H / 2;
+    pivot.add(arm);
+    group.add(pivot);
+    return pivot;
+  };
+  const armL = makeArm(-1);
+  const armR = makeArm( 1);
+
+  // ── Legs (pivot at hip, hang down) ─────────────────────────────────────────
+  const makeLeg = (side) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(side * (AG_LEG_R + 0.015), AG_Y_HIP, 0);
+    const leg = mk(new THREE.CylinderGeometry(AG_LEG_R, AG_LEG_R * 0.8, AG_LEG_H, 6), mat(pantCol));
+    leg.position.y = -AG_LEG_H / 2;
+    pivot.add(leg);
+    // Foot
+    const foot = mk(new THREE.BoxGeometry(AG_LEG_R * 2.2, AG_LEG_R * 1.2, AG_LEG_R * 3.5), mat(pantCol.clone().multiplyScalar(0.6)));
+    foot.position.set(0, -AG_LEG_H + AG_LEG_R * 0.5, AG_LEG_R * 1.2);
+    pivot.add(foot);
+    group.add(pivot);
+    return pivot;
+  };
+  const legL = makeLeg(-1);
+  const legR = makeLeg( 1);
+
+  // Store limb refs on the group for animation
+  group.userData = { head, torso, armL, armR, legL, legR };
+  return group;
+}
+
+function initAgents(scene) {
+  return PEOPLE_DATA.people.map(def => {
+    const mesh = createAgentMesh(def.color);
+    const wp0  = def.route[0];
+    // Group origin = feet level
+    mesh.position.set(wp0.x, wp0.floor * FLOOR_STEP, wp0.z);
+    scene.add(mesh);
+    return {
+      id:       def.id,
+      name:     def.name,
+      age:      def.age,
+      from:     def.from,
+      to:       def.to,
+      color:    def.color,
+      speed:    def.speed,
+      route:    def.route,
+      wpIdx:    0,
+      mesh,
+      walkPhase: Math.random() * Math.PI * 2,  // offset so not all in sync
+    };
+  });
+}
+
+// Walk cycle amplitudes
+const STRIDE_AMP = 0.55;   // leg swing (radians)
+const ARM_AMP    = 0.40;   // arm swing (opposite to legs)
+
+function updateAgents(agents, dt) {
+  for (const ag of agents) {
+    const wp   = ag.route[ag.wpIdx];
+    const cx   = ag.mesh.position.x;
+    const cz   = ag.mesh.position.z;
+    const dx   = wp.x - cx;
+    const dz   = wp.z - cz;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+
+    if (dist < AG_ARRIVE) {
+      ag.wpIdx = (ag.wpIdx + 1) % ag.route.length;
+      continue;
+    }
+
+    // ── XZ movement ──────────────────────────────────────────────────────────
+    const step = ag.speed * dt;
+    const nx = cx + (dx / dist) * Math.min(step, dist);
+    const nz = cz + (dz / dist) * Math.min(step, dist);
+
+    // ── Floor Y — feet must sit exactly on the surface ────────────────────────
+    // On stairs: use analytic ramp formula.
+    // Off stairs: snap to flat floor of the target waypoint.
+    let floorY;
+    if (onStairXZ(nx, nz)) {
+      // Determine which stair segment (0→1 or 1→2) by current height
+      const seg = Math.max(0, Math.min(1,
+        Math.round(ag.mesh.position.y / FLOOR_STEP)
+      ));
+      floorY = rampYatZ(nz, seg);
+    } else {
+      floorY = wp.floor * FLOOR_STEP;
+    }
+
+    // Snap Y directly — no lerp lag, feet stay on ground
+    ag.mesh.position.set(nx, floorY, nz);
+
+    // ── Face direction of travel (Y rotation only — no tilt) ─────────────────
+    ag.mesh.rotation.set(0, Math.atan2(dx, dz), 0);
+
+    // ── Walk cycle ────────────────────────────────────────────────────────────
+    ag.walkPhase += ag.speed * dt * 7.0;
+    const phase = ag.walkPhase;
+    const { head, armL, armR, legL, legR, torso } = ag.mesh.userData;
+
+    // Legs: swing forward/back (rotation.x in pivot local space)
+    // Pivot is at hip, leg hangs down — positive X rotation = leg swings forward
+    legL.rotation.x =  Math.sin(phase) * STRIDE_AMP;
+    legR.rotation.x = -Math.sin(phase) * STRIDE_AMP;
+
+    // Arms: opposite swing to legs (natural gait)
+    armL.rotation.x = -Math.sin(phase) * ARM_AMP;
+    armR.rotation.x =  Math.sin(phase) * ARM_AMP;
+
+    // Body bob: move torso/head up-down, NOT the group (keeps feet on ground)
+    const bob = Math.abs(Math.sin(phase)) * 0.014;
+    torso.position.y = AG_Y_TORSO + bob;
+    head.position.y  = AG_Y_HEAD  + bob;
+    // Arms and legs pivot positions stay fixed — only torso/head bob
+  }
+}
+
+// Detect which agent the player is looking at (dot-product cone test)
+function detectLookedAtAgent(camera, agents, maxDist) {
+  const dir = new THREE.Vector3();
+  camera.getWorldDirection(dir);
+  let closest = null;
+  let closestDist = maxDist;
+  for (const ag of agents) {
+    // Test against agent centre (mid-torso height)
+    const agPos = ag.mesh.position.clone();
+    agPos.y += AG_Y_TORSO;
+    const toAg = agPos.sub(camera.position);
+    const along = toAg.dot(dir);
+    if (along < 0.3 || along > maxDist) continue;
+    const perp = toAg.clone().sub(dir.clone().multiplyScalar(along)).length();
+    if (perp < 0.35 && along < closestDist) {
+      closestDist = along;
+      closest = ag;
+    }
+  }
+  return closest;
+}
+
+// Legacy static crowd (kept for zones that have no agent coverage)
+function buildStaticCrowd(scene, zone, yBase, crowdAnimRef) {
   const ratio = zone.currentCapacity / zone.maxCapacity;
-  const count = Math.round(ratio * 35);
+  const count = Math.max(0, Math.round(ratio * 12)); // fewer — agents fill the rest
   if (count === 0) return;
 
-  const col = new THREE.Color(zone.color || getOccupancyColor(ratio)).lerp(new THREE.Color('#ffffff'), 0.25);
-  const mat = new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.08, roughness: 0.7 });
+  const col = new THREE.Color(zone.color || getOccupancyColor(ratio)).lerp(new THREE.Color('#ffffff'), 0.3);
+  const mat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.75 });
   const bodyGeo = new THREE.CylinderGeometry(0.04, 0.05, 0.48, 6);
   const headGeo = new THREE.SphereGeometry(0.055, 7, 7);
-  const bodies = new THREE.InstancedMesh(bodyGeo, mat, count);
-  const heads  = new THREE.InstancedMesh(headGeo, mat.clone(), count);
+  const bodies  = new THREE.InstancedMesh(bodyGeo, mat, count);
+  const heads   = new THREE.InstancedMesh(headGeo, mat.clone(), count);
   bodies.castShadow = true; heads.castShadow = true;
 
   const dummy = new THREE.Object3D();
   const pad = 0.55;
   for (let i = 0; i < count; i++) {
-    const px = zone.x + (Math.random()-0.5) * (zone.w - pad*2);
-    const pz = zone.z + (Math.random()-0.5) * (zone.d - pad*2);
-    dummy.position.set(px, yBase+0.24, pz); dummy.updateMatrix();
+    const px = zone.x + (Math.random() - 0.5) * (zone.w - pad * 2);
+    const pz = zone.z + (Math.random() - 0.5) * (zone.d - pad * 2);
+    dummy.position.set(px, yBase + 0.24, pz); dummy.updateMatrix();
     bodies.setMatrixAt(i, dummy.matrix);
-    dummy.position.set(px, yBase+0.55, pz); dummy.updateMatrix();
+    dummy.position.set(px, yBase + 0.55, pz); dummy.updateMatrix();
     heads.setMatrixAt(i, dummy.matrix);
-    crowdAnimRef.current.push({ bodies, heads, i, x:px, by:yBase+0.24, hy:yBase+0.55, z:pz, off:Math.random()*Math.PI*2 });
+    crowdAnimRef.current.push({ bodies, heads, i, x: px, by: yBase + 0.24, hy: yBase + 0.55, z: pz, off: Math.random() * Math.PI * 2 });
   }
   bodies.instanceMatrix.needsUpdate = true;
   heads.instanceMatrix.needsUpdate  = true;
@@ -720,6 +883,30 @@ function Crosshair() {
   return <div className="bv-crosshair" />;
 }
 
+// ── Person info HUD (shown when player looks at a walking agent) ──────────────
+function PersonHUD({ agent }) {
+  const history = PEOPLE_HISTORY.history[agent.id] || [];
+  return (
+    <div className="person-hud">
+      <div className="phud-avatar" style={{ background: agent.color + '33', borderColor: agent.color }}>
+        <span style={{ fontSize: 22 }}>🧑</span>
+      </div>
+      <div className="phud-body">
+        <div className="phud-label">Visited Shops</div>
+        <div className="phud-history">
+          {history.map((visit, i) => (
+            <div key={i} className="phud-visit">
+              <span className="phud-visit-shop">🏪 {visit.shop}</span>
+              <span className="phud-visit-meta">{visit.time} · {visit.duration}</span>
+            </div>
+          ))}
+          {history.length === 0 && <div className="phud-visit-empty">No visits yet</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── BuildingViewer ─────────────────────────────────────────────────────────────
 export function BuildingViewer({ zones }) {
   const mountRef     = useRef(null);
@@ -731,17 +918,19 @@ export function BuildingViewer({ zones }) {
   const animRef      = useRef(null);
   const clockRef     = useRef(new THREE.Clock());
   const crowdAnimRef = useRef([]);
+  const agentsRef    = useRef([]);
   const isLockedRef  = useRef(false);
   const walkableRef  = useRef([]);
-  // Smooth movement state
-  const velRef       = useRef(new THREE.Vector2(0, 0)); // XZ velocity (world space)
-  const bobTimeRef   = useRef(0);   // accumulated bob phase
+  const velRef       = useRef(new THREE.Vector2(0, 0));
+  const bobTimeRef   = useRef(0);
   const camYRef      = useRef(EYE_H);
-  const camYUpdateRef= useRef(0);   // throttle React state updates
-
+  const camYUpdateRef= useRef(0);
+  const stairSegRef  = useRef(-1);
   const [isLocked, setIsLocked]   = useState(false);
   const [nearZone, setNearZone]   = useState(null);
   const [camY, setCamY]           = useState(EYE_H);
+  const [lookedAtAgent, setLookedAtAgent] = useState(null);
+  const lookedAtRef = useRef(null);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -828,11 +1017,14 @@ export function BuildingViewer({ zones }) {
       const yBase = zone.floor * FLOOR_STEP;
       buildShopTile(scene, zone, yBase);
       buildZoneVolume(scene, zone, yBase);
-      buildCrowd(scene, zone, yBase, crowdAnimRef);
+      buildStaticCrowd(scene, zone, yBase, crowdAnimRef);
       buildInfoPanel(scene, zone, yBase, billboards);
       buildShopSign(scene, zone, yBase);
     });
     billboardsRef.current = billboards;
+
+    // Spawn animated agents from people.json
+    agentsRef.current = initAgents(scene);
 
     // Keyboard
     const keys = keysRef.current;
@@ -913,53 +1105,62 @@ export function BuildingViewer({ zones }) {
         ));
 
         // ── Stair logic ───────────────────────────────────────────────────────
+        // Check PROPOSED position — stair takes priority over floor-lock
         const onStair = onStairXZ(proposed.x, proposed.z);
 
         if (onStair) {
-          let stairFloor = curFloor;
-          if (proposed.z > STAIR_Z_BOT && curFloor > 0) stairFloor = curFloor - 1;
-          stairFloor = Math.max(0, Math.min(1, stairFloor));
+          // Lock onto the correct stair segment when first stepping on
+          if (stairSegRef.current === -1) {
+            stairSegRef.current = resolveStairSeg(camera.position.y, proposed.z);
+          }
+          const seg = stairSegRef.current;
+          const targetY = rampYatZ(proposed.z, seg) + EYE_H;
 
-          const targetY = rampYatZ(proposed.z, stairFloor) + EYE_H;
+          // Always allow XZ movement on stairs — no floor-lock here
           camera.position.x = proposed.x;
           camera.position.z = proposed.z;
-          // Smooth vertical follow on ramp — faster than floor gravity
-          camera.position.y += (targetY - camera.position.y) * Math.min(12 * dt, 1.0);
+          // Drive Y directly to ramp surface — no lerp lag, feels solid
+          camera.position.y = targetY;
 
         } else {
+          // Left the stair — clear the locked segment
+          stairSegRef.current = -1;
+
           // ── Floor-locked XZ ───────────────────────────────────────────────
-          const insideMall = (
-            Math.abs(proposed.x) < MALL_W / 2 - 0.15 &&
-            proposed.z > -MALL_D / 2 + 0.15 &&
-            proposed.z < MALL_D / 2 - 0.15
+          // Allow: inside mall interior OR ground floor (outside) OR stair corridor
+          const inMallInterior = (
+            Math.abs(proposed.x) < MALL_W / 2 - 0.1 &&
+            proposed.z > -MALL_D / 2 + 0.1 &&
+            proposed.z < MALL_D / 2 - 0.1
           );
-          if (insideMall || curFloor === 0) {
+          const inStairCorridor = onStairXZ(proposed.x, proposed.z);
+          const canMove = inMallInterior || inStairCorridor || curFloor === 0;
+
+          if (canMove) {
             camera.position.x = proposed.x;
             camera.position.z = proposed.z;
           } else {
-            // Slide along wall: try X only, then Z only
+            // Wall-slide: try each axis independently
             const tryX = camera.position.clone(); tryX.x = proposed.x;
             const tryZ = camera.position.clone(); tryZ.z = proposed.z;
-            const xOk = Math.abs(tryX.x) < MALL_W / 2 - 0.15 &&
-                        tryX.z > -MALL_D / 2 + 0.15 && tryX.z < MALL_D / 2 - 0.15;
-            const zOk = Math.abs(tryZ.x) < MALL_W / 2 - 0.15 &&
-                        tryZ.z > -MALL_D / 2 + 0.15 && tryZ.z < MALL_D / 2 - 0.15;
-            if (xOk) camera.position.x = proposed.x;
-            if (zOk) camera.position.z = proposed.z;
-            // Kill velocity component that hit the wall
-            if (!xOk) vel.x = 0;
-            if (!zOk) vel.y = 0;
+            const xOk = (Math.abs(tryX.x) < MALL_W / 2 - 0.1 &&
+                         tryX.z > -MALL_D / 2 + 0.1 && tryX.z < MALL_D / 2 - 0.1)
+                        || onStairXZ(tryX.x, tryX.z);
+            const zOk = (Math.abs(tryZ.x) < MALL_W / 2 - 0.1 &&
+                         tryZ.z > -MALL_D / 2 + 0.1 && tryZ.z < MALL_D / 2 - 0.1)
+                        || onStairXZ(tryZ.x, tryZ.z);
+            if (xOk) camera.position.x = proposed.x; else vel.x = 0;
+            if (zOk) camera.position.z = proposed.z; else vel.y = 0;
           }
 
-          // ── Gravity: smooth snap to floor surface ─────────────────────────
+          // ── Gravity: snap to current floor surface ────────────────────────
           const surfaces = walkableRef.current[curFloor] || [];
           const origin = camera.position.clone(); origin.y += 2.5;
           raycaster.set(origin, rayDown);
           const hits = raycaster.intersectObjects(surfaces, false);
           if (hits.length > 0) {
             const targetY = hits[0].point.y + EYE_H;
-            if (targetY <= camera.position.y + 0.3) {
-              // Exponential snap — feels like real gravity, not teleport
+            if (targetY <= camera.position.y + 0.4) {
               camera.position.y += (targetY - camera.position.y) * Math.min(18 * dt, 1.0);
             }
           }
@@ -984,6 +1185,13 @@ export function BuildingViewer({ zones }) {
         billboardsRef.current.forEach(b => b.lookAt(camera.position));
         detectZone(camera, zones, nearZoneRef, setNearZone);
 
+        // Detect which agent the player is looking at
+        const looked = detectLookedAtAgent(camera, agentsRef.current, 8);
+        if (looked?.id !== lookedAtRef.current?.id) {
+          lookedAtRef.current = looked ?? null;
+          setLookedAtAgent(looked ?? null);
+        }
+
       } else {
         // Idle — stay on the road, gentle head-bob so it feels alive
         camera.position.set(START_X, EYE_H + Math.sin(time * 0.6) * 0.04, START_Z);
@@ -991,7 +1199,7 @@ export function BuildingViewer({ zones }) {
         velRef.current.set(0, 0);
       }
 
-      // Animate crowd
+      // Animate static crowd bob
       const updatedMeshes = new Set();
       const dummy = new THREE.Object3D();
       crowdAnimRef.current.forEach(p => {
@@ -1002,6 +1210,9 @@ export function BuildingViewer({ zones }) {
         p.heads.setMatrixAt(p.i, dummy.matrix);  updatedMeshes.add(p.heads);
       });
       updatedMeshes.forEach(m => m.instanceMatrix.needsUpdate = true);
+
+      // Update walking agents
+      updateAgents(agentsRef.current, dt);
 
       renderer.render(scene, camera);
     }
@@ -1027,8 +1238,10 @@ export function BuildingViewer({ zones }) {
       scene.clear();
       billboardsRef.current = [];
       crowdAnimRef.current  = [];
+      agentsRef.current     = [];
       walkableRef.current   = [];
       nearZoneRef.current   = null;
+      stairSegRef.current   = -1;
     };
   }, [zones]);
 
@@ -1040,9 +1253,10 @@ export function BuildingViewer({ zones }) {
       {!isLocked && <EnterOverlay onEnter={handleClick} />}
       {isLocked  && <Crosshair />}
       {isLocked  && <FloorIndicator y={camY} />}
-      {isLocked  && nearZone && <ZoneHUD zone={nearZone} />}
+      {isLocked  && lookedAtAgent && <PersonHUD agent={lookedAtAgent} />}
+      {isLocked  && nearZone && !lookedAtAgent && <ZoneHUD zone={nearZone} />}
       <div className="bv-hint">
-        W to walk forward into the mall &nbsp;·&nbsp; find the <strong>blue stair sign</strong> on the left wall to go up &nbsp;·&nbsp; ESC to unlock
+        WASD · walk · find the <strong>blue stair sign on the RIGHT wall</strong> to go up/down · ESC to unlock
       </div>
     </div>
   );
