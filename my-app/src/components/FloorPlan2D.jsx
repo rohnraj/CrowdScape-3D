@@ -389,7 +389,7 @@ export function FloorPlan2D({ zones, onLaunch3D }) {
                       onClick={() => setSelectedPerson(isActive ? null : person)}
                     >
                       <span className="fp-person-dot" style={{ background: person.color }} />
-                      <span className="fp-person-name">{person.name.split(' ')[0]}</span>
+                      <span className="fp-person-name">{person.id}</span>
                       <span className="fp-person-route">{person.from} → {person.to}</span>
                     </div>
                   );
@@ -401,7 +401,7 @@ export function FloorPlan2D({ zones, onLaunch3D }) {
               <div className="fp-person-detail">
                 <div className="fp-person-detail-header">
                   <span className="fp-person-dot-lg" style={{ background: selectedPerson.color }} />
-                  <span className="fp-person-detail-name">{selectedPerson.name}</span>
+                  <span className="fp-person-detail-name">{selectedPerson.id}</span>
                 </div>
                 <div className="fp-person-detail-route-summary">
                   <span className="fp-person-from-to">📍 {selectedPerson.from} → 🏁 {selectedPerson.to}</span>
