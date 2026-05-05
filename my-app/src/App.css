@@ -954,3 +954,172 @@ kbd {
   padding: 1px 4px;
   flex-shrink: 0;
 }
+
+/* ── Walking people dots on 2D map ────────────────────────────────────────── */
+.fp-walking-person {
+  position: absolute;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  border: 2px solid;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  z-index: 20;
+  transition: transform 0.1s, box-shadow 0.15s;
+  box-shadow: 0 0 4px rgba(0,0,0,0.4);
+}
+.fp-walking-person:hover {
+  transform: translate(-50%, -50%) scale(1.6);
+  box-shadow: 0 0 10px rgba(255,255,255,0.3);
+}
+.fp-walking-selected {
+  transform: translate(-50%, -50%) scale(1.8);
+  border-color: #fff !important;
+  box-shadow: 0 0 12px rgba(255,255,255,0.5);
+}
+
+/* ── Person info panel (replaces sidebar content when person selected) ─────── */
+.fp-person-panel {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  animation: fade-in 0.2s ease;
+}
+.fp-person-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.fp-person-panel-id {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  flex: 1;
+}
+.fp-person-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.fp-person-close:hover { background: rgba(255,255,255,0.08); color: #fff; }
+
+.fp-person-panel-route {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.fp-person-panel-arrow { color: #475569; }
+
+.fp-stat-grid-inline {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+/* ── Person markers on 2D map (static, clickable) ─────────────────────────── */
+.fp-person-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  z-index: 20;
+  width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.fp-person-marker-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--person-color);
+  border: 2px solid rgba(255,255,255,0.6);
+  box-shadow: 0 0 6px var(--person-color);
+  transition: transform 0.2s, box-shadow 0.2s;
+  z-index: 2;
+}
+
+.fp-person-marker:hover .fp-person-marker-dot {
+  transform: scale(1.4);
+  box-shadow: 0 0 14px var(--person-color);
+}
+
+.fp-person-marker-active .fp-person-marker-dot {
+  transform: scale(1.5);
+  border-color: #fff;
+  box-shadow: 0 0 16px var(--person-color), 0 0 4px #fff;
+}
+
+.fp-person-marker-pulse {
+  position: absolute;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--person-color);
+  opacity: 0;
+  animation: person-pulse 2.5s infinite;
+}
+
+.fp-person-marker-active .fp-person-marker-pulse {
+  animation: person-pulse 1.5s infinite;
+}
+
+@keyframes person-pulse {
+  0%   { transform: scale(0.6); opacity: 0.7; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+.fp-person-marker-label {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(8,12,24,0.85);
+  border: 1px solid var(--person-color);
+  border-radius: 4px;
+  padding: 1px 5px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ── Person panel in sidebar ──────────────────────────────────────────────── */
+.fp-person-panel {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  animation: fade-in 0.2s ease;
+}
+.fp-person-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.fp-person-panel-avatar {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: 2px solid;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.fp-person-panel-info {
+  flex: 1;
+  min-width: 0;
+}
+.fp-person-panel-id {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+.fp-person-panel-route-text {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 1px;
+}
