@@ -180,7 +180,53 @@ export function FloorPlan2D({ zones, onLaunch3D }) {
 
         {/* Sidebar */}
         <div className="fp-sidebar">
-          {selectedPerson ? (
+          {/* Shop hover info */}
+          {hoveredZone && !selectedPerson && (
+            <div className="fp-details">
+              <div className="fp-details-header">
+                <span className="fp-details-emoji">{hoveredZone.emoji}</span>
+                <div>
+                  <h3 className="fp-details-title">{hoveredZone.name}</h3>
+                  <p className="fp-details-cat" style={{ color: hoveredZone.color }}>{hoveredZone.category}</p>
+                </div>
+              </div>
+              <div className="fp-stat-grid-inline">
+                <div className="fp-stat-box"><span className="fp-stat-label">Inside</span><span className="fp-stat-val">{hoveredZone.currentCapacity}</span></div>
+                <div className="fp-stat-box"><span className="fp-stat-label">Max</span><span className="fp-stat-val">{hoveredZone.maxCapacity}</span></div>
+                <div className="fp-stat-box"><span className="fp-stat-label">Free</span><span className="fp-stat-val" style={{ color:'#22c55e' }}>{Math.max(0, hoveredZone.maxCapacity - hoveredZone.currentCapacity)}</span></div>
+              </div>
+              <div className="fp-bar-wrap">
+                <div className="fp-bar-fill" style={{ width: `${Math.min(100, (hoveredZone.currentCapacity / hoveredZone.maxCapacity)*100)}%`, backgroundColor: getOccupancyColor(hoveredZone.currentCapacity / hoveredZone.maxCapacity) }} />
+              </div>
+            </div>
+          )}
+
+          {!hoveredZone && !selectedPerson && (
+            <div className="fp-empty-state">
+              <div className="fp-empty-icon">👆</div>
+              <p>Click a person on the map to see their journey, or hover a shop for details</p>
+            </div>
+          )}
+
+          {/* Floor breakdown — always visible */}
+          <div className="fp-categories">
+            <h4 className="fp-cat-title">Floor Breakdown</h4>
+            {Object.entries(categories).map(([cat, { cur, max }]) => {
+              const r = cur / max;
+              const cc = CATEGORY_COLORS[cat] || '#94a3b8';
+              return (
+                <div key={cat} className="fp-cat-row">
+                  <CategoryDot color={cc} />
+                  <span className="fp-cat-name">{cat}</span>
+                  <div className="fp-cat-bar"><div className="fp-cat-bar-fill" style={{ width:`${Math.min(100,r*100)}%`, background:cc }} /></div>
+                  <span className="fp-cat-pct" style={{ color: cc }}>{Math.round(r*100)}%</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Person detail — below floor breakdown */}
+          {selectedPerson && (
             <div className="fp-person-panel">
               <div className="fp-person-panel-header">
                 <div className="fp-person-panel-avatar" style={{ background: selectedPerson.color + '33', borderColor: selectedPerson.color }}>🧑</div>
@@ -214,46 +260,7 @@ export function FloorPlan2D({ zones, onLaunch3D }) {
                 })}
               </div>
             </div>
-          ) : hoveredZone ? (
-            <div className="fp-details">
-              <div className="fp-details-header">
-                <span className="fp-details-emoji">{hoveredZone.emoji}</span>
-                <div>
-                  <h3 className="fp-details-title">{hoveredZone.name}</h3>
-                  <p className="fp-details-cat" style={{ color: hoveredZone.color }}>{hoveredZone.category}</p>
-                </div>
-              </div>
-              <div className="fp-stat-grid-inline">
-                <div className="fp-stat-box"><span className="fp-stat-label">Inside</span><span className="fp-stat-val">{hoveredZone.currentCapacity}</span></div>
-                <div className="fp-stat-box"><span className="fp-stat-label">Max</span><span className="fp-stat-val">{hoveredZone.maxCapacity}</span></div>
-                <div className="fp-stat-box"><span className="fp-stat-label">Free</span><span className="fp-stat-val" style={{ color:'#22c55e' }}>{Math.max(0, hoveredZone.maxCapacity - hoveredZone.currentCapacity)}</span></div>
-              </div>
-              <div className="fp-bar-wrap">
-                <div className="fp-bar-fill" style={{ width: `${Math.min(100, (hoveredZone.currentCapacity / hoveredZone.maxCapacity)*100)}%`, backgroundColor: getOccupancyColor(hoveredZone.currentCapacity / hoveredZone.maxCapacity) }} />
-              </div>
-            </div>
-          ) : (
-            <div className="fp-empty-state">
-              <div className="fp-empty-icon">👆</div>
-              <p>Click a person on the map to see their journey, or hover a shop for details</p>
-            </div>
           )}
-
-          <div className="fp-categories">
-            <h4 className="fp-cat-title">Floor Breakdown</h4>
-            {Object.entries(categories).map(([cat, { cur, max }]) => {
-              const r = cur / max;
-              const cc = CATEGORY_COLORS[cat] || '#94a3b8';
-              return (
-                <div key={cat} className="fp-cat-row">
-                  <CategoryDot color={cc} />
-                  <span className="fp-cat-name">{cat}</span>
-                  <div className="fp-cat-bar"><div className="fp-cat-bar-fill" style={{ width:`${Math.min(100,r*100)}%`, background:cc }} /></div>
-                  <span className="fp-cat-pct" style={{ color: cc }}>{Math.round(r*100)}%</span>
-                </div>
-              );
-            })}
-          </div>
         </div>
       </div>
     </div>
