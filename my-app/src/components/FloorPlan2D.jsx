@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { getOccupancyColor, getOccupancyLabel, CATEGORY_COLORS } from '../data/zones.js';
+import PEOPLE_DATA from '../data/people.json';
+import PEOPLE_HISTORY from '../data/peopleHistory.json';
 
 // ── Animated counter ──────────────────────────────────────────────────────────
 function AnimatedNumber({ value, duration = 600 }) {
@@ -49,6 +51,7 @@ export function FloorPlan2D({ zones, onLaunch3D }) {
   const [activeFloor, setActiveFloor] = useState(0);
   const [hoveredZone, setHoveredZone] = useState(null);
   const [selectedZone, setSelectedZone] = useState(null);
+  const [selectedPerson, setSelectedPerson] = useState(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
@@ -177,6 +180,109 @@ export function FloorPlan2D({ zones, onLaunch3D }) {
               </svg>
             </div>
             {floorZones.map((zone, i) => renderZone(zone, i))}
+
+            {/* Selected person path overlay — shows route on this floor + floor transitions */}
+            {selectedPerson && (() => {
+              const route = selectedPerson.route;
+              // Get waypoints on this floor with their original index
+              const onFloor = route.map((wp, idx) => ({ ...wp, idx })).filter(wp => wp.floor === activeFloor);
+              if (onFloor.length < 1) return null;
+
+              // Find floor transitions: where the person enters/exits this floor
+              const transitions = [];
+              for (let i = 0; i < route.length; i++) {
+                const cur = route[i];
+                const next = route[(i + 1) % route.length];
+                // Leaving this floor
+                if (cur.floor === activeFloor && next.floor !== activeFloor) {
+                  transitions.push({ type: 'exit', x: cur.x, z: cur.z, toFloor: next.floor });
+                }
+                // Arriving on this floor
+                if (cur.floor !== activeFloor && next.floor === activeFloor) {
+                  transitions.push({ type: 'enter', x: next.x, z: next.z, fromFloor: cur.floor });
+                }
+              }
+
+              const toX = (x) => ((x + 12) / 24) * 100;
+              const toY = (z) => ((z + 8) / 16) * 100;
+              const floorLabels = ['G', 'F1', 'F2'];
+
+              return (
+                <svg className="fp-path-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  {/* Path lines between consecutive waypoints on this floor */}
+                  {onFloor.map((wp, i) => {
+                    if (i === 0) return null;
+                    const prev = onFloor[i - 1];
+                    // Only draw line if they're consecutive in the original route
+                    const consecutive = wp.idx === prev.idx + 1;
+                    return (
+                      <line key={`l${i}`}
+                        x1={toX(prev.x)} y1={toY(prev.z)}
+                        x2={toX(wp.x)} y2={toY(wp.z)}
+                        stroke={selectedPerson.color}
+                        strokeWidth={consecutive ? '0.7' : '0.4'}
+                        strokeDasharray={consecutive ? 'none' : '1.5,1'}
+                        opacity="0.75"
+                        strokeLinecap="round"
+                      />
+                    );
+                  })}
+
+                  {/* Waypoint dots */}
+                  {onFloor.map((wp, i) => (
+                    <circle key={`d${i}`}
+                      cx={toX(wp.x)} cy={toY(wp.z)} r="1.1"
+                      fill={selectedPerson.color} stroke="#0d1424" strokeWidth="0.25"
+                    />
+                  ))}
+
+                  {/* Start marker */}
+                  {onFloor.length > 0 && (
+                    <g>
+                      <circle cx={toX(onFloor[0].x)} cy={toY(onFloor[0].z)} r="2"
+                        fill="none" stroke="#22c55e" strokeWidth="0.5" />
+                      <text x={toX(onFloor[0].x)} y={toY(onFloor[0].z) - 3}
+                        textAnchor="middle" fill="#22c55e" fontSize="2.8" fontWeight="bold">
+                        START
+                      </text>
+                    </g>
+                  )}
+
+                  {/* Floor transition markers */}
+                  {transitions.map((t, i) => {
+                    const cx = toX(t.x);
+                    const cy = toY(t.z);
+                    const isExit = t.type === 'exit';
+                    const otherFloor = isExit ? t.toFloor : t.fromFloor;
+                    const arrowColor = isExit ? '#f97316' : '#22c55e';
+                    const arrow = isExit ? '↗' : '↙';
+                    const label = isExit
+                      ? `→ ${floorLabels[otherFloor]}`
+                      : `← ${floorLabels[otherFloor]}`;
+                    return (
+                      <g key={`t${i}`}>
+                        {/* Pulsing ring */}
+                        <circle cx={cx} cy={cy} r="2.5"
+                          fill={arrowColor + '22'} stroke={arrowColor} strokeWidth="0.4"
+                          strokeDasharray="1.5,0.8"
+                        />
+                        {/* Arrow icon */}
+                        <text x={cx} y={cy + 1} textAnchor="middle" fill={arrowColor} fontSize="3.2">
+                          {arrow}
+                        </text>
+                        {/* Floor label */}
+                        <rect x={cx + 2.5} y={cy - 2} width="8" height="3.5" rx="0.8"
+                          fill="#0d1424" stroke={arrowColor} strokeWidth="0.25" opacity="0.9" />
+                        <text x={cx + 6.5} y={cy + 0.2} textAnchor="middle"
+                          fill={arrowColor} fontSize="2.2" fontWeight="bold">
+                          {label}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </svg>
+              );
+            })()}
           </div>
         </div>
 
@@ -266,6 +372,67 @@ export function FloorPlan2D({ zones, onLaunch3D }) {
                 </div>
               );
             })}
+          </div>
+
+          {/* People on this floor */}
+          <div className="fp-people-section">
+            <h4 className="fp-cat-title">People on Floor</h4>
+            <div className="fp-people-list">
+              {PEOPLE_DATA.people
+                .filter(p => p.route.some(wp => wp.floor === activeFloor))
+                .map(person => {
+                  const isActive = selectedPerson?.id === person.id;
+                  return (
+                    <div
+                      key={person.id}
+                      className={`fp-person-row ${isActive ? 'fp-person-active' : ''}`}
+                      onClick={() => setSelectedPerson(isActive ? null : person)}
+                    >
+                      <span className="fp-person-dot" style={{ background: person.color }} />
+                      <span className="fp-person-name">{person.name.split(' ')[0]}</span>
+                      <span className="fp-person-route">{person.from} → {person.to}</span>
+                    </div>
+                  );
+                })}
+            </div>
+
+            {/* Selected person history */}
+            {selectedPerson && (
+              <div className="fp-person-detail">
+                <div className="fp-person-detail-header">
+                  <span className="fp-person-dot-lg" style={{ background: selectedPerson.color }} />
+                  <span className="fp-person-detail-name">{selectedPerson.name}</span>
+                </div>
+                <div className="fp-person-detail-route-summary">
+                  <span className="fp-person-from-to">📍 {selectedPerson.from} → 🏁 {selectedPerson.to}</span>
+                </div>
+                <div className="fp-person-floors-visited">
+                  {[...new Set(selectedPerson.route.map(wp => wp.floor))].sort().map(f => (
+                    <span key={f} className="fp-person-floor-badge" style={{
+                      background: f === activeFloor ? 'rgba(96,165,250,0.2)' : 'rgba(255,255,255,0.05)',
+                      color: f === activeFloor ? '#60a5fa' : '#64748b',
+                      border: f === activeFloor ? '1px solid rgba(96,165,250,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                    }}>
+                      {['Ground', 'Floor 1', 'Floor 2'][f]}
+                    </span>
+                  ))}
+                </div>
+                <div className="fp-person-history-label">Visit History</div>
+                <div className="fp-person-history">
+                  {(PEOPLE_HISTORY.history[selectedPerson.id] || []).map((v, i) => {
+                    const shop = zones.find(z => z.name === v.shop);
+                    return (
+                      <div key={i} className="fp-person-visit">
+                        <span className="fp-person-visit-dot" style={{ background: shop?.color || '#64748b' }} />
+                        <span className="fp-person-visit-shop">{v.shop}</span>
+                        <span className="fp-person-visit-floor">{shop ? ['G', 'F1', 'F2'][shop.floor] : ''}</span>
+                        <span className="fp-person-visit-time">{v.time}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

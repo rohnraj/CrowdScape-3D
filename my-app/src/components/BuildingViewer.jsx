@@ -160,229 +160,78 @@ function makeFloorLabel(text) {
 
 // ── Decorative plaza tiles (like the image) ───────────────────────────────────
 function buildPlaza(scene, walkable) {
-  // Base ground — also walkable so gravity works outside the mall
-  const plazaGeo = new THREE.PlaneGeometry(120, 120);
-  const plazaMat = new THREE.MeshStandardMaterial({ color: '#c8d4a0', roughness: 0.95 });
+  // Base ground — single large plane, walkable
+  const plazaGeo = new THREE.PlaneGeometry(80, 80);
+  const plazaMat = new THREE.MeshLambertMaterial({ color: '#b8c890' });
   const plaza = new THREE.Mesh(plazaGeo, plazaMat);
   plaza.rotation.x = -Math.PI / 2;
   plaza.position.y = -0.02;
   plaza.receiveShadow = true;
   scene.add(plaza);
-  walkable.push(plaza);   // ← player can stand on the ground outside
+  walkable.push(plaza);
 
-  // Decorative tile grid
-  const tileColors = ['#d4e8a0', '#e8c8a0', '#a0c8d4', '#d4a0c8', '#c8d4a0'];
-  const tileSize = 2.5;
-  const tileGeo = new THREE.PlaneGeometry(tileSize - 0.08, tileSize - 0.08);
-  for (let xi = -16; xi <= 16; xi++) {
-    for (let zi = -16; zi <= 16; zi++) {
-      const cx = xi * tileSize, cz = zi * tileSize;
-      if (Math.abs(cx) < MALL_W/2 + 2 && Math.abs(cz) < MALL_D/2 + 2) continue;
-      const col = tileColors[(Math.abs(xi*3 + zi*7)) % tileColors.length];
-      const mat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.9 });
-      const m = new THREE.Mesh(tileGeo, mat);
-      m.rotation.x = -Math.PI / 2;
-      m.position.set(cx, -0.04, cz);
-      m.receiveShadow = true;
-      scene.add(m);
-    }
-  }
-
-  // Decorative circular patterns (like the image)
-  const circlePositions = [[-22, -18], [22, -18], [-22, 18], [22, 18]];
-  circlePositions.forEach(([cx, cz]) => {
-    for (let r = 0; r < 5; r++) {
-      const segments = 8 + r * 4;
-      for (let s = 0; s < segments; s++) {
-        const angle = (s / segments) * Math.PI * 2;
-        const radius = 1.5 + r * 1.4;
-        const px = cx + Math.cos(angle) * radius;
-        const pz = cz + Math.sin(angle) * radius;
-        const wedgeColors = ['#e8a070', '#70c8a0', '#a070e8', '#e8d070'];
-        const wMat = new THREE.MeshStandardMaterial({
-          color: wedgeColors[s % wedgeColors.length], roughness: 0.85
-        });
-        const wGeo = new THREE.PlaneGeometry(1.1, 1.1);
-        const wm = new THREE.Mesh(wGeo, wMat);
-        wm.rotation.x = -Math.PI / 2;
-        wm.position.set(px, -0.03, pz);
-        scene.add(wm);
-      }
-    }
-  });
-
-  // Road — a flat box so raycaster hits it reliably
-  const roadMat = new THREE.MeshStandardMaterial({ color: '#3a3d42', roughness: 0.95 });
+  // Road — single flat box
+  const roadMat = new THREE.MeshLambertMaterial({ color: '#3a3d42' });
   const road = new THREE.Mesh(new THREE.BoxGeometry(10, 0.04, 60), roadMat);
-  road.position.set(0, -0.0, MALL_D/2 + 30);
+  road.position.set(0, 0, MALL_D / 2 + 30);
   road.receiveShadow = true;
   scene.add(road);
-  walkable.push(road);   // ← player walks on the road
-
-  // Road markings
-  for (let i = -4; i <= 4; i++) {
-    const markMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9 });
-    const mark = new THREE.Mesh(new THREE.PlaneGeometry(0.25, 3), markMat);
-    mark.rotation.x = -Math.PI / 2;
-    mark.position.set(0, -0.01, MALL_D/2 + 10 + i * 6);
-    scene.add(mark);
-  }
-
-  // Landscaping — green strips
-  const grassMat = new THREE.MeshStandardMaterial({ color: '#5a8a30', roughness: 1.0 });
-  [[-35, 0], [35, 0]].forEach(([gx, gz]) => {
-    const gm = new THREE.Mesh(new THREE.PlaneGeometry(10, 60), grassMat);
-    gm.rotation.x = -Math.PI / 2;
-    gm.position.set(gx, -0.03, gz);
-    gm.receiveShadow = true;
-    scene.add(gm);
-  });
+  walkable.push(road);
 }
 
 // ── Floor slab ────────────────────────────────────────────────────────────────
 function buildFloorSlab(scene, yBase, floorIndex, walkableByFloor) {
   const geo = new THREE.BoxGeometry(MALL_W + 0.2, 0.15, MALL_D + 0.2);
-  const mat = new THREE.MeshStandardMaterial({ color: '#dde4ea', roughness: 0.85, metalness: 0.05 });
+  const mat = new THREE.MeshLambertMaterial({ color: '#dde4ea' });
   const m = new THREE.Mesh(geo, mat);
   m.position.set(0, yBase - 0.075, 0);
-  m.castShadow = true; m.receiveShadow = true;
   scene.add(m);
   walkableByFloor[floorIndex].push(m);
-  m.add(new THREE.LineSegments(
-    new THREE.EdgesGeometry(geo),
-    new THREE.LineBasicMaterial({ color: '#8899aa', transparent: true, opacity: 0.4 })
-  ));
 }
 
-// ── Glass facade walls (mall style) ──────────────────────────────────────────
+// ── Glass facade walls (mall style — lightweight) ────────────────────────────
 function buildGlassFacade(scene, yBase, floorIndex) {
-  const glassMat = new THREE.MeshPhysicalMaterial({
-    color: '#7dd3fc',
-    transparent: true, opacity: 0.28,
-    side: THREE.DoubleSide,
-    roughness: 0.04, metalness: 0.08,
-    transmission: 0.85, ior: 1.52,
-    clearcoat: 1.0, clearcoatRoughness: 0.05,
+  const glassMat = new THREE.MeshLambertMaterial({
+    color: '#7dd3fc', transparent: true, opacity: 0.22, side: THREE.DoubleSide,
   });
-  const frameMat = new THREE.MeshStandardMaterial({ color: '#c0c8d0', roughness: 0.4, metalness: 0.7 });
-  const edgeMat  = new THREE.LineBasicMaterial({ color: '#e0f0ff', transparent: true, opacity: 0.35 });
-
+  const edgeMat = new THREE.LineBasicMaterial({ color: '#a0d8f0', transparent: true, opacity: 0.3 });
   const cy = yBase + FLOOR_H / 2;
-  const panelW = 2.0;
 
-  // Helper: add a glass wall with frame grid
-  const addGlassWall = (x, y, z, w, h, ry) => {
+  const addWall = (x, y, z, w, h, ry) => {
     const geo = new THREE.PlaneGeometry(w, h);
-    const mesh = new THREE.Mesh(geo, glassMat.clone());
+    const mesh = new THREE.Mesh(geo, glassMat);
     mesh.position.set(x, y, z);
     mesh.rotation.y = ry;
     scene.add(mesh);
-    mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat.clone()));
-
-    // Vertical frame mullions
-    const cols = Math.floor(w / panelW);
-    for (let c = 0; c <= cols; c++) {
-      const fx = -w/2 + c * panelW;
-      const fGeo = new THREE.BoxGeometry(0.06, h, 0.06);
-      const fm = new THREE.Mesh(fGeo, frameMat);
-      fm.position.set(fx, 0, 0);
-      mesh.add(fm);
-    }
-    // Horizontal frame rails
-    const rows = Math.floor(h / 1.2);
-    for (let r = 0; r <= rows; r++) {
-      const fy = -h/2 + r * 1.2;
-      const rGeo = new THREE.BoxGeometry(w, 0.06, 0.06);
-      const rm = new THREE.Mesh(rGeo, frameMat);
-      rm.position.set(0, fy, 0);
-      mesh.add(rm);
-    }
+    mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat));
   };
 
   if (floorIndex === 0) {
-    // Grand entrance cutout on front wall
-    const gapW = 6;
-    const sideW = (MALL_W - gapW) / 2;
-    addGlassWall(-gapW/2 - sideW/2, cy, MALL_D/2, sideW, FLOOR_H, Math.PI);
-    addGlassWall( gapW/2 + sideW/2, cy, MALL_D/2, sideW, FLOOR_H, Math.PI);
-    // Top transom
-    const topH = FLOOR_H - 2.4;
-    addGlassWall(0, yBase + 2.4 + topH/2, MALL_D/2, gapW, topH, Math.PI);
-
-    // Entrance frame posts
-    const postGeo = new THREE.BoxGeometry(0.18, 2.4, 0.18);
-    [-gapW/2, gapW/2].forEach(px => {
-      const post = new THREE.Mesh(postGeo, frameMat);
-      post.position.set(px, yBase + 1.2, MALL_D/2);
-      post.castShadow = true;
-      scene.add(post);
-    });
+    const gapW = 6, sideW = (MALL_W - gapW) / 2;
+    addWall(-gapW / 2 - sideW / 2, cy, MALL_D / 2, sideW, FLOOR_H, Math.PI);
+    addWall( gapW / 2 + sideW / 2, cy, MALL_D / 2, sideW, FLOOR_H, Math.PI);
   } else {
-    addGlassWall(0, cy, MALL_D/2, MALL_W, FLOOR_H, Math.PI);
+    addWall(0, cy, MALL_D / 2, MALL_W, FLOOR_H, Math.PI);
   }
-
-  // Back, left, right walls
-  addGlassWall(0,          cy, -MALL_D/2, MALL_W, FLOOR_H, 0);
-  addGlassWall( MALL_W/2,  cy, 0,         MALL_D, FLOOR_H, -Math.PI/2);
-  addGlassWall(-MALL_W/2,  cy, 0,         MALL_D, FLOOR_H,  Math.PI/2);
+  addWall(0,         cy, -MALL_D / 2, MALL_W, FLOOR_H, 0);
+  addWall( MALL_W/2, cy, 0,           MALL_D, FLOOR_H, -Math.PI / 2);
+  addWall(-MALL_W/2, cy, 0,           MALL_D, FLOOR_H,  Math.PI / 2);
 }
 
-// ── Atrium skylight roof ──────────────────────────────────────────────────────
+// ── Roof ──────────────────────────────────────────────────────────────────────
 function buildRoof(scene, yTop) {
-  const roofMat = new THREE.MeshStandardMaterial({ color: '#e8edf2', roughness: 0.7, metalness: 0.2 });
+  const roofMat = new THREE.MeshLambertMaterial({ color: '#e0e5ea' });
   const roof = new THREE.Mesh(new THREE.BoxGeometry(MALL_W + 0.4, 0.3, MALL_D + 0.4), roofMat);
   roof.position.set(0, yTop, 0);
-  roof.castShadow = true; roof.receiveShadow = true;
+  roof.receiveShadow = true;
   scene.add(roof);
-
-  // Skylight glass panels on roof
-  const skyMat = new THREE.MeshPhysicalMaterial({
-    color: '#bae6fd', transparent: true, opacity: 0.4,
-    roughness: 0.02, metalness: 0.0, transmission: 0.9,
-  });
-  const skyGeo = new THREE.PlaneGeometry(10, 8);
-  const sky = new THREE.Mesh(skyGeo, skyMat);
-  sky.rotation.x = -Math.PI / 2;
-  sky.position.set(0, yTop + 0.16, 0);
-  scene.add(sky);
-
-  // Rooftop HVAC cylinders (like the image)
-  const cylMat = new THREE.MeshStandardMaterial({ color: '#9ca3af', roughness: 0.6, metalness: 0.5 });
-  const cylPositions = [[-4,-2],[-2,-2],[0,-2],[2,-2],[4,-2],[-3,1],[0,1],[3,1]];
-  cylPositions.forEach(([cx, cz]) => {
-    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 1.4, 10), cylMat);
-    cyl.position.set(cx, yTop + 0.85, cz);
-    cyl.castShadow = true;
-    scene.add(cyl);
-    // Cap
-    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.12, 10), cylMat);
-    cap.position.set(cx, yTop + 1.62, cz);
-    scene.add(cap);
-  });
-
-  // Parapet wall
-  const parapetMat = new THREE.MeshStandardMaterial({ color: '#f0f4f8', roughness: 0.8 });
-  [
-    [0, yTop+0.45, MALL_D/2+0.1, MALL_W+0.4, 0.6, 0.2],
-    [0, yTop+0.45, -MALL_D/2-0.1, MALL_W+0.4, 0.6, 0.2],
-    [MALL_W/2+0.1, yTop+0.45, 0, 0.2, 0.6, MALL_D+0.4],
-    [-MALL_W/2-0.1, yTop+0.45, 0, 0.2, 0.6, MALL_D+0.4],
-  ].forEach(([x,y,z,w,h,d]) => {
-    const pm = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), parapetMat);
-    pm.position.set(x,y,z);
-    pm.castShadow = true;
-    scene.add(pm);
-  });
 }
 
 // ── Stairs ────────────────────────────────────────────────────────────────────
-// Visual-only geometry — movement is handled analytically via rampYatZ().
-// We still push the ramp mesh into walkable[] as a fallback for the raycaster
-// when the player is mid-ramp and the floor slab is out of range.
 function buildStairs(scene, walkableByFloor) {
-  const rampMat  = new THREE.MeshStandardMaterial({ color: '#334155', roughness: 0.85, metalness: 0.25 });
-  const railMat  = new THREE.MeshStandardMaterial({ color: '#94a3b8', roughness: 0.35, metalness: 0.65 });
-  const landMat  = new THREE.MeshStandardMaterial({ color: '#475569', roughness: 0.8 });
+  const rampMat = new THREE.MeshLambertMaterial({ color: '#334155' });
+  const railMat = new THREE.MeshLambertMaterial({ color: '#94a3b8' });
+  const landMat = new THREE.MeshLambertMaterial({ color: '#475569' });
 
   for (let floor = 0; floor < 2; floor++) {
     const yBot = floor * FLOOR_STEP;
@@ -391,132 +240,72 @@ function buildStairs(scene, walkableByFloor) {
     const yMid = (yBot + yTop) / 2;
     const angle = Math.atan2(yTop - yBot, STAIR_Z_BOT - STAIR_Z_TOP);
 
-    // ── Ramp surface ──────────────────────────────────────────────────────────
-    const rampGeo = new THREE.BoxGeometry(STAIR_W, 0.18, STAIR_LEN + 0.4);
-    const ramp = new THREE.Mesh(rampGeo, rampMat);
+    // Ramp
+    const ramp = new THREE.Mesh(new THREE.BoxGeometry(STAIR_W, 0.18, STAIR_LEN + 0.4), rampMat);
     ramp.position.set(STAIR_X, yMid, zMid);
     ramp.rotation.x = angle;
-    ramp.castShadow = true;
-    ramp.receiveShadow = true;
     scene.add(ramp);
     walkableByFloor[floor].push(ramp);
     walkableByFloor[floor + 1].push(ramp);
 
-    // ── Step treads (visual) ──────────────────────────────────────────────────
-    const STEPS = 14;
-    for (let s = 0; s < STEPS; s++) {
-      const t  = (s + 0.5) / STEPS;
-      const sz = STAIR_Z_BOT + (STAIR_Z_TOP - STAIR_Z_BOT) * t;
-      const sy = yBot + (yTop - yBot) * t;
-      const tGeo = new THREE.BoxGeometry(STAIR_W - 0.1, 0.07, STAIR_LEN / STEPS - 0.05);
-      const tMesh = new THREE.Mesh(tGeo, railMat);
-      tMesh.position.set(STAIR_X, sy + 0.1, sz);
-      scene.add(tMesh);
-    }
-
-    // ── Handrails ─────────────────────────────────────────────────────────────
-    [-STAIR_W / 2 + 0.12, STAIR_W / 2 - 0.12].forEach(dx => {
-      const rGeo = new THREE.BoxGeometry(0.07, 0.07, STAIR_LEN + 0.5);
-      const rail = new THREE.Mesh(rGeo, railMat);
-      rail.position.set(STAIR_X + dx, yMid + 0.65, zMid);
+    // Handrails (just 2 bars, no posts)
+    [-STAIR_W / 2 + 0.1, STAIR_W / 2 - 0.1].forEach(dx => {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, STAIR_LEN + 0.4), railMat);
+      rail.position.set(STAIR_X + dx, yMid + 0.6, zMid);
       rail.rotation.x = angle;
       scene.add(rail);
-      for (let p = 0; p <= 5; p++) {
-        const pt = p / 5;
-        const pz = STAIR_Z_BOT + (STAIR_Z_TOP - STAIR_Z_BOT) * pt;
-        const py = yBot + (yTop - yBot) * pt;
-        const postGeo = new THREE.BoxGeometry(0.06, 0.7, 0.06);
-        const post = new THREE.Mesh(postGeo, railMat);
-        post.position.set(STAIR_X + dx, py + 0.35, pz);
-        scene.add(post);
-      }
     });
 
-    // ── Stairwell enclosure walls ─────────────────────────────────────────────
-    const wallMat = new THREE.MeshStandardMaterial({ color: '#1e293b', roughness: 0.9, transparent: true, opacity: 0.5 });
+    // Side walls
     [-STAIR_W / 2 - 0.06, STAIR_W / 2 + 0.06].forEach(dx => {
-      const wGeo = new THREE.BoxGeometry(0.12, FLOOR_STEP + 0.5, STAIR_LEN + 0.7);
-      const wall = new THREE.Mesh(wGeo, wallMat);
+      const wall = new THREE.Mesh(
+        new THREE.BoxGeometry(0.1, FLOOR_STEP + 0.3, STAIR_LEN + 0.5),
+        new THREE.MeshLambertMaterial({ color: '#1e293b', transparent: true, opacity: 0.4 })
+      );
       wall.position.set(STAIR_X + dx, yMid, zMid);
       scene.add(wall);
     });
 
-    // ── Bottom landing ────────────────────────────────────────────────────────
-    const botLand = new THREE.Mesh(new THREE.BoxGeometry(STAIR_W + 0.4, 0.15, 2.4), landMat);
-    botLand.position.set(STAIR_X, yBot - 0.075, STAIR_Z_BOT + 1.2);
-    botLand.receiveShadow = true;
+    // Landings
+    const botLand = new THREE.Mesh(new THREE.BoxGeometry(STAIR_W + 0.3, 0.15, 2.0), landMat);
+    botLand.position.set(STAIR_X, yBot - 0.075, STAIR_Z_BOT + 1.0);
     scene.add(botLand);
     walkableByFloor[floor].push(botLand);
 
-    // ── Top landing ───────────────────────────────────────────────────────────
-    const topLand = new THREE.Mesh(new THREE.BoxGeometry(STAIR_W + 0.4, 0.15, 2.4), landMat);
-    topLand.position.set(STAIR_X, yTop - 0.075, STAIR_Z_TOP - 1.2);
-    topLand.receiveShadow = true;
+    const topLand = new THREE.Mesh(new THREE.BoxGeometry(STAIR_W + 0.3, 0.15, 2.0), landMat);
+    topLand.position.set(STAIR_X, yTop - 0.075, STAIR_Z_TOP - 1.0);
     scene.add(topLand);
     walkableByFloor[floor + 1].push(topLand);
 
-    // ── Glowing "▲ Floor N+1" sign at stair bottom ───────────────────────────
-    const signMat = new THREE.MeshStandardMaterial({
-      color: '#1e40af', roughness: 0.5,
-      emissive: '#3b82f6', emissiveIntensity: 0.7,
-    });
-    const signBox = new THREE.Mesh(new THREE.BoxGeometry(STAIR_W - 0.1, 0.55, 0.1), signMat);
-    signBox.position.set(STAIR_X, yBot + 2.5, STAIR_Z_BOT + 0.15);
-    scene.add(signBox);
-
+    // Sign
     const makeSignCanvas = (text, bg, fg) => {
       const sc = document.createElement('canvas');
-      sc.width = 256; sc.height = 72;
+      sc.width = 256; sc.height = 64;
       const ctx = sc.getContext('2d');
-      ctx.fillStyle = bg; ctx.fillRect(0, 0, 256, 72);
-      ctx.fillStyle = fg; ctx.font = 'bold 26px system-ui';
+      ctx.fillStyle = bg; ctx.fillRect(0, 0, 256, 64);
+      ctx.fillStyle = fg; ctx.font = 'bold 24px system-ui';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(text, 128, 36);
+      ctx.fillText(text, 128, 32);
       return new THREE.CanvasTexture(sc);
     };
-
     const upSign = new THREE.Mesh(
-      new THREE.PlaneGeometry(STAIR_W - 0.15, 0.5),
-      new THREE.MeshBasicMaterial({ map: makeSignCanvas(`▲  Floor ${floor + 1}`, '#1d4ed8', '#ffffff'), transparent: true })
+      new THREE.PlaneGeometry(STAIR_W - 0.2, 0.4),
+      new THREE.MeshBasicMaterial({ map: makeSignCanvas(`▲ Floor ${floor + 1}`, '#1d4ed8', '#fff'), transparent: true })
     );
-    upSign.position.set(STAIR_X, yBot + 2.5, STAIR_Z_BOT + 0.22);
+    upSign.position.set(STAIR_X, yBot + 2.3, STAIR_Z_BOT + 0.2);
     scene.add(upSign);
-
-    // ── "▼ Floor N" sign at stair top ─────────────────────────────────────────
-    const downSign = new THREE.Mesh(
-      new THREE.PlaneGeometry(STAIR_W - 0.15, 0.5),
-      new THREE.MeshBasicMaterial({ map: makeSignCanvas(`▼  Floor ${floor}`, '#374151', '#d1d5db'), transparent: true })
-    );
-    downSign.position.set(STAIR_X, yTop + 2.5, STAIR_Z_TOP - 0.22);
-    downSign.rotation.y = Math.PI;
-    scene.add(downSign);
   }
 }
 
 // ── Shop floor tile ───────────────────────────────────────────────────────────
 function buildShopTile(scene, zone, yBase) {
-  const ratio = zone.currentCapacity / zone.maxCapacity;
-  const shopColor = new THREE.Color(zone.color || getOccupancyColor(ratio));
-  const darkColor = shopColor.clone().multiplyScalar(0.35);
-
+  const shopColor = new THREE.Color(zone.color || '#94a3b8');
   const geo = new THREE.PlaneGeometry(zone.w - 0.1, zone.d - 0.1);
-  const mat = new THREE.MeshStandardMaterial({
-    color: darkColor,
-    emissive: shopColor,
-    emissiveIntensity: 0.12,
-    roughness: 0.8,
-  });
+  const mat = new THREE.MeshLambertMaterial({ color: shopColor.clone().multiplyScalar(0.5) });
   const m = new THREE.Mesh(geo, mat);
   m.rotation.x = -Math.PI / 2;
   m.position.set(zone.x, yBase + 0.016, zone.z);
-  m.receiveShadow = true;
   scene.add(m);
-
-  // Border glow
-  m.add(new THREE.LineSegments(
-    new THREE.EdgesGeometry(geo),
-    new THREE.LineBasicMaterial({ color: shopColor, transparent: true, opacity: 0.6 })
-  ));
 }
 
 // ── Shop sign (storefront) ────────────────────────────────────────────────────
@@ -1033,14 +822,11 @@ export function BuildingViewer({ zones }) {
     camera.lookAt(START_X, EYE_H, 0);   // look straight at the front gate
     cameraRef.current = camera;
 
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    // Renderer — optimized for performance
+    const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
     renderer.setSize(W, H);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15;
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer.shadowMap.enabled = false;
     mount.appendChild(renderer.domElement);
 
     // Controls
@@ -1049,32 +835,12 @@ export function BuildingViewer({ zones }) {
     controls.addEventListener('unlock', () => { setIsLocked(false); isLockedRef.current = false; });
     controlsRef.current = controls;
 
-    // Lights
-    scene.add(new THREE.AmbientLight('#e8f0ff', 0.7));
-
-    const sun = new THREE.DirectionalLight('#fff8e8', 2.0);
-    sun.position.set(25, 40, -15);
-    sun.castShadow = true;
-    sun.shadow.mapSize.width  = 2048;
-    sun.shadow.mapSize.height = 2048;
-    sun.shadow.camera.near = 0.5;
-    sun.shadow.camera.far  = 120;
-    sun.shadow.camera.left = -30; sun.shadow.camera.right = 30;
-    sun.shadow.camera.top  =  30; sun.shadow.camera.bottom = -30;
-    sun.shadow.bias = -0.0004;
+    // Lights — minimal, no shadows
+    scene.add(new THREE.AmbientLight('#ffffff', 0.9));
+    const sun = new THREE.DirectionalLight('#fff8e8', 1.2);
+    sun.position.set(20, 30, -10);
     scene.add(sun);
-
-    // Hemisphere sky light
-    scene.add(new THREE.HemisphereLight('#87ceeb', '#4a7c3f', 0.5));
-
-    // Per-zone point lights
-    zones.forEach(zone => {
-      const yBase = zone.floor * FLOOR_STEP;
-      const lc = new THREE.Color(zone.color || '#ffffff').lerp(new THREE.Color('#ffffff'), 0.4);
-      const light = new THREE.PointLight(lc, 1.2, Math.max(zone.w, zone.d) * 1.8);
-      light.position.set(zone.x, yBase + FLOOR_H - 0.3, zone.z);
-      scene.add(light);
-    });
+    scene.add(new THREE.HemisphereLight('#87ceeb', '#4a7c3f', 0.4));
 
     // Build world
     // walkableByFloor[f] = surfaces the player can stand on while on floor f
@@ -1095,18 +861,14 @@ export function BuildingViewer({ zones }) {
     buildStairs(scene, walkableByFloor);
     walkableRef.current = walkableByFloor;
 
-    // Zone geometry
-    const billboards = [];
+    // Zone geometry — lightweight: just floor tiles and shop signs
     crowdAnimRef.current = [];
     zones.forEach(zone => {
       const yBase = zone.floor * FLOOR_STEP;
       buildShopTile(scene, zone, yBase);
-      buildZoneVolume(scene, zone, yBase);
-      buildStaticCrowd(scene, zone, yBase, crowdAnimRef);
-      buildInfoPanel(scene, zone, yBase, billboards);
       buildShopSign(scene, zone, yBase);
     });
-    billboardsRef.current = billboards;
+    billboardsRef.current = [];
 
     // Spawn animated agents from people.json
     agentsRef.current = initAgents(scene);
@@ -1267,7 +1029,6 @@ export function BuildingViewer({ zones }) {
           setCamY(camYRef.current);
         }
 
-        billboardsRef.current.forEach(b => b.lookAt(camera.position));
         detectZone(camera, zones, nearZoneRef, setNearZone);
 
         // Detect which agent the player is looking at
@@ -1284,17 +1045,7 @@ export function BuildingViewer({ zones }) {
         velRef.current.set(0, 0);
       }
 
-      // Animate static crowd bob
-      const updatedMeshes = new Set();
-      const dummy = new THREE.Object3D();
-      crowdAnimRef.current.forEach(p => {
-        const yOff = Math.abs(Math.sin(time * 3.2 + p.off)) * 0.045;
-        dummy.position.set(p.x, p.by + yOff, p.z); dummy.updateMatrix();
-        p.bodies.setMatrixAt(p.i, dummy.matrix); updatedMeshes.add(p.bodies);
-        dummy.position.set(p.x, p.hy + yOff, p.z); dummy.updateMatrix();
-        p.heads.setMatrixAt(p.i, dummy.matrix);  updatedMeshes.add(p.heads);
-      });
-      updatedMeshes.forEach(m => m.instanceMatrix.needsUpdate = true);
+      // Animate static crowd bob (removed — no static crowd)
 
       // Update walking agents
       updateAgents(agentsRef.current, dt);
