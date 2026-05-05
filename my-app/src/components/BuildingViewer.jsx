@@ -884,25 +884,110 @@ function Crosshair() {
 }
 
 // ── Person info HUD (shown when player looks at a walking agent) ──────────────
-function PersonHUD({ agent }) {
+function PersonHUD({ agent, zones }) {
   const history = PEOPLE_HISTORY.history[agent.id] || [];
+
+  // Build a lookup: shop name → { x, z, floor, color }
+  const shopMap = {};
+  zones.forEach(z => { shopMap[z.name] = z; });
+
+  // Resolve visited shops to coordinates for the mini-map
+  const visits = history.map(v => {
+    const shop = shopMap[v.shop];
+    return shop ? { ...v, x: shop.x, z: shop.z, floor: shop.floor, color: shop.color } : null;
+  }).filter(Boolean);
+
+  // SVG mini-map dimensions
+  const MAP_W = 200, MAP_H = 130;
+  // Mall bounds: X[-12,12], Z[-8,8]
+  const toSvgX = (x) => ((x + 12) / 24) * MAP_W;
+  const toSvgY = (z) => ((z + 8) / 16) * MAP_H;
+
+  // Floor colors
+  const floorColors = ['#60a5fa', '#c084fc', '#fbbf24'];
+  const floorLabels = ['G', 'F1', 'F2'];
+
   return (
     <div className="person-hud">
-      <div className="phud-avatar" style={{ background: agent.color + '33', borderColor: agent.color }}>
-        <span style={{ fontSize: 22 }}>🧑</span>
-      </div>
-      <div className="phud-body">
-        <div className="phud-label">Visited Shops</div>
-        <div className="phud-history">
-          {history.map((visit, i) => (
-            <div key={i} className="phud-visit">
-              <span className="phud-visit-shop">🏪 {visit.shop}</span>
-              <span className="phud-visit-meta">{visit.time} · {visit.duration}</span>
-            </div>
-          ))}
-          {history.length === 0 && <div className="phud-visit-empty">No visits yet</div>}
+      <div className="phud-left">
+        <div className="phud-avatar" style={{ background: agent.color + '33', borderColor: agent.color }}>
+          <span style={{ fontSize: 20 }}>🧑</span>
+        </div>
+        <div className="phud-body">
+          <div className="phud-label">Visited Shops</div>
+          <div className="phud-history">
+            {history.map((visit, i) => (
+              <div key={i} className="phud-visit">
+                <span className="phud-visit-dot" style={{ background: shopMap[visit.shop]?.color || '#94a3b8' }} />
+                <span className="phud-visit-shop">{visit.shop}</span>
+                <span className="phud-visit-meta">{visit.time}</span>
+              </div>
+            ))}
+            {history.length === 0 && <div className="phud-visit-empty">No visits yet</div>}
+          </div>
         </div>
       </div>
+      {visits.length > 1 && (
+        <div className="phud-map">
+          <div className="phud-map-title">Walking Path</div>
+          <svg width={MAP_W} height={MAP_H} viewBox={`0 0 ${MAP_W} ${MAP_H}`} className="phud-svg">
+            {/* Mall outline */}
+            <rect x="0" y="0" width={MAP_W} height={MAP_H} rx="6" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.1)" strokeWidth="1"/>
+            {/* Path lines connecting visits */}
+            {visits.map((v, i) => {
+              if (i === 0) return null;
+              const prev = visits[i - 1];
+              const sameFloor = v.floor === prev.floor;
+              return (
+                <line
+                  key={`l${i}`}
+                  x1={toSvgX(prev.x)} y1={toSvgY(prev.z)}
+                  x2={toSvgX(v.x)} y2={toSvgY(v.z)}
+                  stroke={sameFloor ? floorColors[v.floor] : '#475569'}
+                  strokeWidth={sameFloor ? 1.5 : 1}
+                  strokeDasharray={sameFloor ? 'none' : '3,2'}
+                  opacity="0.7"
+                />
+              );
+            })}
+            {/* Visit dots */}
+            {visits.map((v, i) => (
+              <g key={`d${i}`}>
+                <circle
+                  cx={toSvgX(v.x)} cy={toSvgY(v.z)}
+                  r={i === visits.length - 1 ? 5 : 3.5}
+                  fill={v.color || floorColors[v.floor]}
+                  stroke="#0d1424" strokeWidth="1"
+                  opacity={i === visits.length - 1 ? 1 : 0.8}
+                />
+                {/* Floor label on first and last */}
+                {(i === 0 || i === visits.length - 1) && (
+                  <text
+                    x={toSvgX(v.x)} y={toSvgY(v.z) - 7}
+                    textAnchor="middle" fill="rgba(255,255,255,0.7)"
+                    fontSize="8" fontWeight="bold"
+                  >
+                    {floorLabels[v.floor]}
+                  </text>
+                )}
+              </g>
+            ))}
+            {/* Floor legend */}
+            {[0, 1, 2].map(f => {
+              const hasVisit = visits.some(v => v.floor === f);
+              if (!hasVisit) return null;
+              return (
+                <g key={`fl${f}`}>
+                  <circle cx={10 + f * 28} cy={MAP_H - 10} r={4} fill={floorColors[f]} opacity="0.8"/>
+                  <text x={17 + f * 28} y={MAP_H - 7} fill="rgba(255,255,255,0.5)" fontSize="7">
+                    {floorLabels[f]}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      )}
     </div>
   );
 }
@@ -1253,7 +1338,7 @@ export function BuildingViewer({ zones }) {
       {!isLocked && <EnterOverlay onEnter={handleClick} />}
       {isLocked  && <Crosshair />}
       {isLocked  && <FloorIndicator y={camY} />}
-      {isLocked  && lookedAtAgent && <PersonHUD agent={lookedAtAgent} />}
+      {isLocked  && lookedAtAgent && <PersonHUD agent={lookedAtAgent} zones={zones} />}
       {isLocked  && nearZone && !lookedAtAgent && <ZoneHUD zone={nearZone} />}
       <div className="bv-hint">
         WASD · walk · find the <strong>blue stair sign on the RIGHT wall</strong> to go up/down · ESC to unlock
