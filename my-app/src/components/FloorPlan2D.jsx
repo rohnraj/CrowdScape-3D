@@ -1,10 +1,22 @@
 import { useState, useEffect } from 'react';
-import { getOccupancyColor, getOccupancyLabel, CATEGORY_COLORS } from '../data/zones.js';
+import { getOccupancyColor, CATEGORY_COLORS } from '../data/zones.js';
 import PEOPLE_DATA from '../data/people.json';
 import PEOPLE_HISTORY from '../data/peopleHistory.json';
 
 function CategoryDot({ color }) {
   return <span style={{ display:'inline-block', width:9, height:9, borderRadius:'50%', background:color, marginRight:5, flexShrink:0 }} />;
+}
+
+// Build a person's journey as an ordered list of zone stops from peopleHistory.json
+// Each stop: { zone, time, duration, stepNum }
+function buildJourney(personId, zones) {
+  const history = PEOPLE_HISTORY.history[personId] || [];
+  const stops = [];
+  for (const visit of history) {
+    const zone = zones.find(z => z.name === visit.shop);
+    if (zone) stops.push({ zone, time: visit.time, duration: visit.duration });
+  }
+  return stops;
 }
 
 export function FloorPlan2D({ zones, onLaunch3D }) {
@@ -17,11 +29,18 @@ export function FloorPlan2D({ zones, onLaunch3D }) {
 
   const floorZones = zones.filter(z => z.floor === activeFloor);
   const floors = [...new Set(zones.map(z => z.floor))].sort();
-
-  // People whose first waypoint is on this floor (their "home" position)
-  const floorPeople = PEOPLE_DATA.people.filter(p => p.route[0].floor === activeFloor);
-
   const BW = 24, BD = 16;
+  const toLeftPct = x => ((x + 12) / BW) * 100;
+  const toTopPct  = z => ((z + 8) / BD) * 100;
+
+  // Pre-compute journey for selected person
+  const journey = selectedPerson ? buildJourney(selectedPerson.id, zones) : [];
+
+  // People who have at least one visit on this floor
+  const floorPeople = PEOPLE_DATA.people.filter(p => {
+    const hist = PEOPLE_HISTORY.history[p.id] || [];
+    return hist.some(v => zones.find(z => z.name === v.shop && z.floor === activeFloor));
+  });
 
   const renderZone = (zone, i) => {
     const leftPct   = ((zone.x - zone.w/2 + 12) / BW) * 100;
@@ -31,16 +50,18 @@ export function FloorPlan2D({ zones, onLaunch3D }) {
     const ratio     = zone.currentCapacity / zone.maxCapacity;
     const shopColor = zone.color || getOccupancyColor(ratio);
     const isHovered = hoveredZone?.id === zone.id;
+    // Highlight if selected person visited this zone
+    const visitedBySelected = selectedPerson && journey.some(s => s.zone.id === zone.id);
 
     return (
-      <div
-        key={zone.id}
-        className={`fp-zone ${isHovered ? 'fp-zone-active' : ''}`}
+      <div key={zone.id}
+        className={`fp-zone ${isHovered ? 'fp-zone-active' : ''} ${visitedBySelected ? 'fp-zone-visited' : ''}`}
         style={{
           left: `${leftPct}%`, top: `${topPct}%`,
           width: `${widthPct}%`, height: `${heightPct}%`,
-          backgroundColor: isHovered ? shopColor + '44' : shopColor + '18',
+          backgroundColor: visitedBySelected ? shopColor + '55' : isHovered ? shopColor + '44' : shopColor + '18',
           borderColor: shopColor,
+          borderWidth: visitedBySelected ? 2 : 1.5,
           animationDelay: `${i * 40}ms`,
         }}
         onMouseEnter={() => setHoveredZone(zone)}
@@ -57,6 +78,114 @@ export function FloorPlan2D({ zones, onLaunch3D }) {
     );
   };
 
+  // ── Path overlay: drawn from peopleHistory stops in order ──────────────────
+  const renderPersonPath = () => {
+    if (!selectedPerson || journey.length < 1) return null;
+
+    const floorLabels = ['G', 'F1', 'F2'];
+
+    // Stops on the active floor (with their global step index)
+    const onFloor = journey
+      .map((s, idx) => ({ ...s, stepIdx: idx }))
+      .filter(s => s.zone.floor === activeFloor);
+
+    // Floor transitions: consecutive stops where floor changes
+    const transitions = [];
+    for (let i = 0; i < journey.length - 1; i++) {
+      const cur  = journey[i];
+      const next = journey[i + 1];
+      if (cur.zone.floor !== next.zone.floor) {
+        // Exit point: last stop on current floor before switching
+        if (cur.zone.floor === activeFloor) {
+          transitions.push({ type: 'exit', x: cur.zone.x, z: cur.zone.z, toFloor: next.zone.floor, stepIdx: i });
+        }
+        // Entry point: first stop on this floor after switching
+        if (next.zone.floor === activeFloor) {
+          transitions.push({ type: 'enter', x: next.zone.x, z: next.zone.z, fromFloor: cur.zone.floor, stepIdx: i + 1 });
+        }
+      }
+    }
+
+    return (
+      <svg className="fp-path-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+        {/* Lines connecting consecutive stops on this floor */}
+        {onFloor.map((stop, i) => {
+          if (i === 0) return null;
+          const prev = onFloor[i - 1];
+          // Are they consecutive in the full journey?
+          const consecutive = stop.stepIdx === prev.stepIdx + 1;
+          return (
+            <line key={`l${i}`}
+              x1={toLeftPct(prev.zone.x)} y1={toTopPct(prev.zone.z)}
+              x2={toLeftPct(stop.zone.x)} y2={toTopPct(stop.zone.z)}
+              stroke={selectedPerson.color}
+              strokeWidth={consecutive ? '0.8' : '0.4'}
+              strokeDasharray={consecutive ? 'none' : '2,1.5'}
+              opacity="0.85" strokeLinecap="round"
+            />
+          );
+        })}
+
+        {/* Stop dots with step numbers */}
+        {onFloor.map((stop, i) => {
+          const cx = toLeftPct(stop.zone.x);
+          const cy = toTopPct(stop.zone.z);
+          const stepNum = stop.stepIdx + 1;
+          const isFirst = stop.stepIdx === 0;
+          const isLast  = stop.stepIdx === journey.length - 1;
+          return (
+            <g key={`s${i}`}>
+              {/* Outer ring for first/last */}
+              {(isFirst || isLast) && (
+                <circle cx={cx} cy={cy} r="2.8"
+                  fill="none"
+                  stroke={isFirst ? '#22c55e' : '#f97316'}
+                  strokeWidth="0.5"
+                />
+              )}
+              {/* Main dot */}
+              <circle cx={cx} cy={cy} r="1.6"
+                fill={selectedPerson.color} stroke="#0d1424" strokeWidth="0.3"
+              />
+              {/* Step number */}
+              <text x={cx} y={cy + 0.55} textAnchor="middle"
+                fill="#fff" fontSize="1.6" fontWeight="bold">
+                {stepNum}
+              </text>
+              {/* Shop name label */}
+              <text x={cx} y={cy - 2.5} textAnchor="middle"
+                fill="rgba(255,255,255,0.75)" fontSize="1.8">
+                {stop.zone.name.length > 10 ? stop.zone.name.slice(0, 9) + '…' : stop.zone.name}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Floor transition arrows */}
+        {transitions.map((t, i) => {
+          const cx = toLeftPct(t.x);
+          const cy = toTopPct(t.z);
+          const isExit = t.type === 'exit';
+          const color  = isExit ? '#f97316' : '#22c55e';
+          const label  = isExit ? `→${floorLabels[t.toFloor]}` : `←${floorLabels[t.fromFloor]}`;
+          return (
+            <g key={`t${i}`}>
+              <circle cx={cx} cy={cy} r="2.8"
+                fill={color + '22'} stroke={color} strokeWidth="0.4" strokeDasharray="1.2,0.6" />
+              <text x={cx} y={cy + 1} textAnchor="middle" fill={color} fontSize="3">
+                {isExit ? '↗' : '↙'}
+              </text>
+              <rect x={cx + 3} y={cy - 2} width="7.5" height="3.2" rx="0.8"
+                fill="#0d1424" stroke={color} strokeWidth="0.25" opacity="0.95" />
+              <text x={cx + 6.8} y={cy + 0.2} textAnchor="middle"
+                fill={color} fontSize="2.1" fontWeight="bold">{label}</text>
+            </g>
+          );
+        })}
+      </svg>
+    );
+  };
+
   // Categories
   const categories = {};
   floorZones.forEach(z => {
@@ -64,61 +193,10 @@ export function FloorPlan2D({ zones, onLaunch3D }) {
     categories[z.category].cur += z.currentCapacity;
     categories[z.category].max += z.maxCapacity;
   });
-  const floorTotal = floorZones.reduce((s,z) => s + z.currentCapacity, 0);
-  const floorMax   = floorZones.reduce((s,z) => s + z.maxCapacity, 0);
-  const floorRatio = floorMax > 0 ? floorTotal / floorMax : 0;
+  const floorTotal    = floorZones.reduce((s,z) => s + z.currentCapacity, 0);
+  const floorMax      = floorZones.reduce((s,z) => s + z.maxCapacity, 0);
+  const floorRatio    = floorMax > 0 ? floorTotal / floorMax : 0;
   const floorOccColor = getOccupancyColor(floorRatio);
-
-  // Person path overlay
-  const renderPersonPath = () => {
-    if (!selectedPerson) return null;
-    const route = selectedPerson.route;
-    const onFloor = route.map((wp, idx) => ({ ...wp, idx })).filter(wp => wp.floor === activeFloor);
-    if (onFloor.length < 1) return null;
-
-    const transitions = [];
-    for (let i = 0; i < route.length; i++) {
-      const cur = route[i], next = route[(i + 1) % route.length];
-      if (cur.floor === activeFloor && next.floor !== activeFloor)
-        transitions.push({ type: 'exit', x: cur.x, z: cur.z, toFloor: next.floor });
-      if (cur.floor !== activeFloor && next.floor === activeFloor)
-        transitions.push({ type: 'enter', x: next.x, z: next.z, fromFloor: cur.floor });
-    }
-
-    const toX = x => ((x + 12) / 24) * 100;
-    const toY = z => ((z + 8) / 16) * 100;
-    const fl = ['G', 'F1', 'F2'];
-
-    return (
-      <svg className="fp-path-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-        {onFloor.map((wp, i) => {
-          if (i === 0) return null;
-          const prev = onFloor[i - 1];
-          const consecutive = wp.idx === prev.idx + 1;
-          return <line key={`l${i}`} x1={toX(prev.x)} y1={toY(prev.z)} x2={toX(wp.x)} y2={toY(wp.z)}
-            stroke={selectedPerson.color} strokeWidth={consecutive ? '0.7' : '0.35'}
-            strokeDasharray={consecutive ? 'none' : '1.5,1'} opacity="0.8" strokeLinecap="round" />;
-        })}
-        {onFloor.map((wp, i) => (
-          <circle key={`d${i}`} cx={toX(wp.x)} cy={toY(wp.z)} r="1" fill={selectedPerson.color} stroke="#0d1424" strokeWidth="0.2" />
-        ))}
-        {transitions.map((t, i) => {
-          const cx = toX(t.x), cy = toY(t.z);
-          const isExit = t.type === 'exit';
-          const color = isExit ? '#f97316' : '#22c55e';
-          const label = isExit ? `→${fl[t.toFloor]}` : `←${fl[t.fromFloor]}`;
-          return (
-            <g key={`t${i}`}>
-              <circle cx={cx} cy={cy} r="2.2" fill={color+'22'} stroke={color} strokeWidth="0.35" strokeDasharray="1.2,0.6" />
-              <text x={cx} y={cy+0.8} textAnchor="middle" fill={color} fontSize="2.6">{isExit ? '↗' : '↙'}</text>
-              <rect x={cx+2.2} y={cy-1.8} width="6.5" height="3" rx="0.7" fill="#0d1424" stroke={color} strokeWidth="0.2" opacity="0.92" />
-              <text x={cx+5.5} y={cy+0.1} textAnchor="middle" fill={color} fontSize="2" fontWeight="bold">{label}</text>
-            </g>
-          );
-        })}
-      </svg>
-    );
-  };
 
   return (
     <div className={`fp-container ${mounted ? 'fp-mounted' : ''}`}>
@@ -140,7 +218,9 @@ export function FloorPlan2D({ zones, onLaunch3D }) {
             ))}
           </div>
           <button className="fp-btn-launch" onClick={onLaunch3D}>
-            <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" width="16" height="16">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
             Walk in 3D
           </button>
         </div>
@@ -155,24 +235,52 @@ export function FloorPlan2D({ zones, onLaunch3D }) {
           <div className="fp-map">
             {floorZones.map((zone, i) => renderZone(zone, i))}
 
-            {/* Static people markers */}
-            {floorPeople.map(person => {
-              const wp = person.route[0];
-              const leftPct = ((wp.x + 12) / 24) * 100;
-              const topPct  = ((wp.z + 8) / 16) * 100;
-              const isSelected = selectedPerson?.id === person.id;
-              return (
-                <div key={person.id}
-                  className={`fp-person-marker ${isSelected ? 'fp-person-marker-active' : ''}`}
-                  style={{ left: `${leftPct}%`, top: `${topPct}%`, '--person-color': person.color }}
-                  onClick={(e) => { e.stopPropagation(); setSelectedPerson(isSelected ? null : person); }}
-                >
-                  <div className="fp-person-marker-dot" />
-                  <div className="fp-person-marker-pulse" />
-                  {isSelected && <div className="fp-person-marker-label">{person.id}</div>}
-                </div>
+            {/* Person dots — placed at their first visited shop on this floor, offset if overlapping */}
+            {(() => {
+              // Group people by their first-visit zone on this floor
+              const zoneGroups = {};
+              for (const person of floorPeople) {
+                const hist = PEOPLE_HISTORY.history[person.id] || [];
+                const firstVisit = hist.find(v => {
+                  const z = zones.find(zz => zz.name === v.shop);
+                  return z && z.floor === activeFloor;
+                });
+                if (!firstVisit) continue;
+                const zone = zones.find(z => z.name === firstVisit.shop);
+                if (!zone) continue;
+                const key = zone.id;
+                if (!zoneGroups[key]) zoneGroups[key] = { zone, people: [] };
+                zoneGroups[key].people.push(person);
+              }
+
+              return Object.values(zoneGroups).flatMap(({ zone, people }) =>
+                people.map((person, idx) => {
+                  // Spread dots in a small arc around the zone centre
+                  const total = people.length;
+                  const angle = total > 1 ? (idx / total) * Math.PI * 2 : 0;
+                  const radius = total > 1 ? 3.5 : 0; // % offset
+                  const offsetX = total > 1 ? Math.cos(angle) * radius : 0;
+                  const offsetY = total > 1 ? Math.sin(angle) * radius : 0;
+
+                  const leftPct  = toLeftPct(zone.x) + offsetX;
+                  const topPct   = toTopPct(zone.z) + offsetY;
+                  const isSelected = selectedPerson?.id === person.id;
+
+                  return (
+                    <div key={person.id}
+                      className={`fp-person-marker ${isSelected ? 'fp-person-marker-active' : ''}`}
+                      style={{ left: `${leftPct}%`, top: `${topPct}%`, '--person-color': person.color }}
+                      onClick={e => { e.stopPropagation(); setSelectedPerson(isSelected ? null : person); }}
+                      title={person.id}
+                    >
+                      <div className="fp-person-marker-dot" />
+                      <div className="fp-person-marker-pulse" />
+                      {isSelected && <div className="fp-person-marker-label">{person.id}</div>}
+                    </div>
+                  );
+                })
               );
-            })}
+            })()}
 
             {renderPersonPath()}
           </div>
@@ -180,7 +288,6 @@ export function FloorPlan2D({ zones, onLaunch3D }) {
 
         {/* Sidebar */}
         <div className="fp-sidebar">
-          {/* Shop hover info */}
           {hoveredZone && !selectedPerson && (
             <div className="fp-details">
               <div className="fp-details-header">
@@ -204,11 +311,11 @@ export function FloorPlan2D({ zones, onLaunch3D }) {
           {!hoveredZone && !selectedPerson && (
             <div className="fp-empty-state">
               <div className="fp-empty-icon">👆</div>
-              <p>Click a person on the map to see their journey, or hover a shop for details</p>
+              <p>Click a person dot to see their journey, or hover a shop for details</p>
             </div>
           )}
 
-          {/* Floor breakdown — always visible */}
+          {/* Floor breakdown */}
           <div className="fp-categories">
             <h4 className="fp-cat-title">Floor Breakdown</h4>
             {Object.entries(categories).map(([cat, { cur, max }]) => {
@@ -225,7 +332,7 @@ export function FloorPlan2D({ zones, onLaunch3D }) {
             })}
           </div>
 
-          {/* Person detail — below floor breakdown */}
+          {/* Person journey panel — same data as map path */}
           {selectedPerson && (
             <div className="fp-person-panel">
               <div className="fp-person-panel-header">
@@ -236,8 +343,10 @@ export function FloorPlan2D({ zones, onLaunch3D }) {
                 </div>
                 <button className="fp-person-close" onClick={() => setSelectedPerson(null)}>✕</button>
               </div>
+
+              {/* Floors visited badges */}
               <div className="fp-person-floors-visited">
-                {[...new Set(selectedPerson.route.map(wp => wp.floor))].sort().map(f => (
+                {[...new Set(journey.map(s => s.zone.floor))].sort().map(f => (
                   <span key={f} className="fp-person-floor-badge" style={{
                     background: f === activeFloor ? 'rgba(96,165,250,0.2)' : 'rgba(255,255,255,0.05)',
                     color: f === activeFloor ? '#60a5fa' : '#64748b',
@@ -245,16 +354,34 @@ export function FloorPlan2D({ zones, onLaunch3D }) {
                   }}>{['Ground', 'Floor 1', 'Floor 2'][f]}</span>
                 ))}
               </div>
-              <div className="fp-person-history-label">Visit History</div>
+
+              <div className="fp-person-history-label">Journey ({journey.length} stops)</div>
               <div className="fp-person-history">
-                {(PEOPLE_HISTORY.history[selectedPerson.id] || []).map((v, i) => {
-                  const shop = zones.find(z => z.name === v.shop);
+                {journey.map((stop, i) => {
+                  const isOnActiveFloor = stop.zone.floor === activeFloor;
+                  const floorLabel = ['G', 'F1', 'F2'][stop.zone.floor];
+                  // Show floor-change indicator between stops
+                  const prevFloor = i > 0 ? journey[i - 1].zone.floor : null;
+                  const floorChanged = prevFloor !== null && prevFloor !== stop.zone.floor;
                   return (
-                    <div key={i} className="fp-person-visit">
-                      <span className="fp-person-visit-dot" style={{ background: shop?.color || '#64748b' }} />
-                      <span className="fp-person-visit-shop">{v.shop}</span>
-                      <span className="fp-person-visit-floor">{shop ? ['G','F1','F2'][shop.floor] : ''}</span>
-                      <span className="fp-person-visit-time">{v.time}</span>
+                    <div key={i}>
+                      {floorChanged && (
+                        <div className="fp-journey-floor-change">
+                          <span className="fp-journey-floor-arrow">
+                            {stop.zone.floor > prevFloor ? '⬆' : '⬇'}
+                          </span>
+                          <span className="fp-journey-floor-label">
+                            {stop.zone.floor > prevFloor ? 'Went up to' : 'Went down to'} {['Ground', 'Floor 1', 'Floor 2'][stop.zone.floor]}
+                          </span>
+                        </div>
+                      )}
+                      <div className={`fp-person-visit ${isOnActiveFloor ? 'fp-person-visit-active' : 'fp-person-visit-dim'}`}>
+                        <span className="fp-person-visit-num">{i + 1}</span>
+                        <span className="fp-person-visit-dot" style={{ background: stop.zone.color }} />
+                        <span className="fp-person-visit-shop">{stop.zone.name}</span>
+                        <span className="fp-person-visit-floor">{floorLabel}</span>
+                        <span className="fp-person-visit-time">{stop.time}</span>
+                      </div>
                     </div>
                   );
                 })}

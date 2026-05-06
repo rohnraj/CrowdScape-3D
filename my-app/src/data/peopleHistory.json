@@ -54,6 +54,9 @@
       { "shop": "Starbucks", "time": "12:00 PM", "duration": "10 min" }
     ],
     "p010": [
+      { "shop": "Grand Atrium", "time": "09:00 AM", "duration": "5 min" },
+      { "shop": "Zara", "time": "09:10 AM", "duration": "20 min" },
+      { "shop": "Starbucks", "time": "09:35 AM", "duration": "10 min" },
       { "shop": "Rolex Boutique", "time": "10:30 AM", "duration": "20 min" },
       { "shop": "Louis Vuitton", "time": "11:00 AM", "duration": "45 min" },
       { "shop": "Food Court", "time": "11:50 AM", "duration": "30 min" },

@@ -181,7 +181,7 @@
       ]
     },
     {
-      "id": "p010", "name": "Vikram Joshi", "age": 45, "color": "#d4af37",
+      "id": "p010", "name": "Vikram Joshi", "age": 45, "color": "#e85d04",
       "from": "Rolex Boutique", "to": "Luxury Spa", "speed": 1.15,
       "route": [
         { "x": -1.0, "z":  4.5, "floor": 2 },

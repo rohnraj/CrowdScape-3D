@@ -1123,3 +1123,46 @@ kbd {
   color: var(--muted);
   margin-top: 1px;
 }
+
+/* ── Person visit step number ─────────────────────────────────────────────── */
+.fp-person-visit-num {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.fp-person-visit-dim {
+  opacity: 0.45;
+}
+
+/* ── Journey floor-change indicator ──────────────────────────────────────── */
+.fp-journey-floor-change {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px;
+  margin: 3px 0;
+  background: rgba(255,255,255,0.04);
+  border-left: 2px solid rgba(96,165,250,0.4);
+  border-radius: 0 4px 4px 0;
+}
+.fp-journey-floor-arrow {
+  font-size: 11px;
+  color: #60a5fa;
+}
+.fp-journey-floor-label {
+  font-size: 9px;
+  color: #60a5fa;
+  font-style: italic;
+}
+.fp-person-visit-active {
+  opacity: 1;
+}
+/* fp-zone highlight when visited by selected person */
+.fp-zone-visited {
+  box-shadow: 0 0 14px rgba(255,255,255,0.15) !important;
+}
